@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: 2026 roolrz
 # SPDX-License-Identifier: Apache-2.0
 
+bin = [{name = "hyper-abi", path = "src/bin/hyper-abi.rs", required-features = ["generator"]}]
+
 [package]
 name = "hyper-abi"
 version = "0.0.0"
@@ -14,14 +16,9 @@ publish = false
 default = []
 generator = []
 
-[[bin]]
-name = "hyper-abi"
-path = "src/bin/hyper-abi.rs"
-required-features = [
-    "generator",
-]
-
 [dependencies]
+
+[lints]
 
 [lints.clippy]
 doc_markdown = "deny"
@@ -33,10 +30,3 @@ unwrap_used = "deny"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
-
-[workspace]
-members = [
-    ".",
-    "filesystem",
-]
-resolver = "3"
