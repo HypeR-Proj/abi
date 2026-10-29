@@ -1,58 +1,13 @@
 {
   "version": 1,
   "name": "abi",
-  "kind": "library",
+  "kind": "interface",
   "origin": {
     "repository": "https://github.com/roolrz/HypeR",
     "commit": "8d42d047058a2b58a291803700e86487fb723f7a"
   },
-  "sources": {
-    "Cargo.lock": "sdk/abi/Cargo.lock",
-    "Cargo.toml": "sdk/abi/Cargo.toml",
-    "README.md": "sdk/abi/README.md",
-    "docs/native.md": "sdk/abi/docs/native.md",
-    "docs/physical-devices.md": "sdk/abi/docs/physical-devices.md",
-    "generator/mod.rs": "sdk/abi/generator/mod.rs",
-    "generator/names.rs": "sdk/abi/generator/names.rs",
-    "generator/render/c.rs": "sdk/abi/generator/render/c.rs",
-    "generator/render/documentation.rs": "sdk/abi/generator/render/documentation.rs",
-    "generator/render/mod.rs": "sdk/abi/generator/render/mod.rs",
-    "generator/render/reference.rs": "sdk/abi/generator/render/reference.rs",
-    "generator/render/rust.rs": "sdk/abi/generator/render/rust.rs",
-    "generator/tests.rs": "sdk/abi/generator/tests.rs",
-    "generator/validation/handles.rs": "sdk/abi/generator/validation/handles.rs",
-    "generator/validation/invocations.rs": "sdk/abi/generator/validation/invocations.rs",
-    "generator/validation/mod.rs": "sdk/abi/generator/validation/mod.rs",
-    "generator/validation/records.rs": "sdk/abi/generator/validation/records.rs",
-    "include/hyper/native.h": "sdk/abi/include/hyper/native.h",
-    "schema/arguments.rs": "sdk/abi/schema/arguments.rs",
-    "schema/capabilities.rs": "sdk/abi/schema/capabilities.rs",
-    "schema/invocations.rs": "sdk/abi/schema/invocations.rs",
-    "schema/model.rs": "sdk/abi/schema/model.rs",
-    "schema/native.rs": "sdk/abi/schema/native.rs",
-    "schema/records.rs": "sdk/abi/schema/records.rs",
-    "schema/semantics.rs": "sdk/abi/schema/semantics.rs",
-    "schema/values.rs": "sdk/abi/schema/values.rs",
-    "src/bin/hyper-abi.rs": "sdk/abi/src/bin/hyper-abi.rs",
-    "src/generated.rs": "sdk/abi/src/generated.rs",
-    "src/lib.rs": "sdk/abi/src/lib.rs",
-    "tests/cli.rs": "sdk/abi/tests/cli.rs",
-    "tests/generated_c.rs": "sdk/abi/tests/generated_c.rs",
-    "tests/generated_rust.rs": "sdk/abi/tests/generated_rust.rs",
-    "filesystem/Cargo.toml": "stdlib/rust/hyper-filesystem/Cargo.toml",
-    "filesystem/src/lib.rs": "stdlib/rust/hyper-filesystem/src/lib.rs",
-    "filesystem/src/protocol/directory.rs": "stdlib/rust/hyper-filesystem/src/protocol/directory.rs",
-    "filesystem/src/protocol/extents.rs": "stdlib/rust/hyper-filesystem/src/protocol/extents.rs",
-    "filesystem/src/protocol/mod.rs": "stdlib/rust/hyper-filesystem/src/protocol/mod.rs",
-    "filesystem/src/time.rs": "stdlib/rust/hyper-filesystem/src/time.rs",
-    "filesystem/tests/protocol.rs": "stdlib/rust/hyper-filesystem/tests/protocol.rs"
-  },
   "SPDX-FileCopyrightText": "2026 roolrz",
   "SPDX-License-Identifier": "Apache-2.0",
-  "mounts": {
-    "": "sdk/abi",
-    "filesystem": "stdlib/rust/hyper-filesystem"
-  },
   "packages": [],
   "tests": [
     [
@@ -61,28 +16,6 @@
       "--manifest-path",
       "sdk/abi/Cargo.toml",
       "--all-features"
-    ],
-    [
-      "cargo",
-      "test",
-      "--manifest-path",
-      "stdlib/rust/Cargo.toml",
-      "-p",
-      "hyper-filesystem"
     ]
-  ],
-  "cargo_context": {
-    "Cargo.toml": {
-      "workspace": null,
-      "membership": null,
-      "dependency_paths": {},
-      "inherited_dependencies": {}
-    },
-    "filesystem/Cargo.toml": {
-      "workspace": null,
-      "membership": "..",
-      "dependency_paths": {},
-      "inherited_dependencies": {}
-    }
-  }
+  ]
 }
