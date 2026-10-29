@@ -7,7 +7,7 @@ version = "0.0.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "Machine-readable definitions for the HypeR Native ABI"
-repository = "https://github.com/roolrz/HypeR"
+repository = "https://github.com/HypeR-Proj/abi"
 publish = false
 
 [features]
@@ -17,7 +17,9 @@ generator = []
 [[bin]]
 name = "hyper-abi"
 path = "src/bin/hyper-abi.rs"
-required-features = ["generator"]
+required-features = [
+    "generator",
+]
 
 [dependencies]
 
@@ -31,3 +33,10 @@ unwrap_used = "deny"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
+
+[workspace]
+members = [
+    ".",
+    "filesystem",
+]
+resolver = "3"

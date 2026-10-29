@@ -145,4 +145,15 @@ uses `scripts/docs/Doxyfile` for C API extraction.
 ## License
 
 Licensed under the Apache License, Version 2.0. See
-[the project license](../../LICENSE).
+[the project license](https://github.com/HypeR-Proj/HypeR/blob/main/LICENSE).
+
+## Workspace tests
+
+Use the [HypeR workspace](https://github.com/HypeR-Proj/HypeR) to resolve dependencies:
+
+```sh
+./HypeR/hyper test abi
+```
+
+Build paths in detailed documentation refer to the generated `out/system` directory.
+Edit this repository and prepare the workspace again before building.

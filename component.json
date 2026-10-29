@@ -59,7 +59,8 @@
       "cargo",
       "test",
       "--manifest-path",
-      "sdk/abi/Cargo.toml"
+      "sdk/abi/Cargo.toml",
+      "--all-features"
     ],
     [
       "cargo",
@@ -69,5 +70,19 @@
       "-p",
       "hyper-filesystem"
     ]
-  ]
+  ],
+  "cargo_context": {
+    "Cargo.toml": {
+      "workspace": null,
+      "membership": null,
+      "dependency_paths": {},
+      "inherited_dependencies": {}
+    },
+    "filesystem/Cargo.toml": {
+      "workspace": null,
+      "membership": "..",
+      "dependency_paths": {},
+      "inherited_dependencies": {}
+    }
+  }
 }
