@@ -17,5 +17,19 @@
       "sdk/abi/Cargo.toml",
       "--all-features"
     ]
-  ]
+  ],
+  "build": {
+    "steps": [
+      [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "{source}/Cargo.toml",
+        "--target-dir",
+        "{out}",
+        "--release",
+        "--locked"
+      ]
+    ]
+  }
 }
