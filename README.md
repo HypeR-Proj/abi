@@ -137,7 +137,7 @@ uses `scripts/docs/Doxyfile` for C API extraction.
 ## Ownership boundary
 
 - The kernel implements and validates the machine contract.
-- `stdlib/hyper/` provides the C runtime and architecture invocation veneers.
+- `stdlib/system/` provides the C runtime and architecture invocation veneers.
 - `stdlib/rust/` provides raw and safe Native Rust application bindings.
 - `sdk/toolchain/` assembles the compiler, linker, headers, and runtime into a
   consumable SDK.
