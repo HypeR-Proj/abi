@@ -125,14 +125,13 @@ scalar declaration; multiple `///` lines are supported:
 deadline_infinite = u64::MAX,
 ```
 
-These comments appear in Rustdoc, Doxygen and the Markdown reference. Do not edit
-generated comments separately. Semantic rules are plain prose; the renderers
-escape angle brackets so path placeholders and comparisons remain visible.
-The documentation site retains `EXTRACT_ALL = NO`: undocumented C implementation
-details are not exposed merely to make the ABI visible.
+These comments are preserved in the generated Rust, C and Markdown interfaces.
+Do not edit generated comments separately. Semantic rules are plain prose; the
+renderers escape angle brackets so placeholders and comparisons remain visible.
 
-Validate Rustdoc with `cargo doc --no-deps`. The repository documentation build
-uses `scripts/docs/Doxyfile` for C API extraction.
+Use `cargo doc --no-deps` for local Rust API documentation. The published site
+provides the generated Markdown ABI reference; it does not expose undocumented
+C implementation details.
 
 ## Ownership boundary
 
