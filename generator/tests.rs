@@ -1557,3 +1557,60 @@ fn rejects_invalid_failure_registers_and_authority_outputs() {
         );
     }
 }
+
+#[test]
+fn suspension_contract_covers_faultable_user_memory() {
+    let wrong: Vec<_> = schema::INVOCATIONS
+        .iter()
+        .filter(|call| {
+            call.arguments
+                .iter()
+                .any(|argument| argument.memory.is_some())
+                && call.blocking == schema::BlockingClass::Never
+        })
+        .map(|call| call.name)
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "faultable user buffers declared Never: {wrong:?}"
+    );
+}
+
+#[test]
+fn suspension_contract_covers_reclaim_and_mapping_waits() -> Result<(), String> {
+    for name in [
+        "vmo_create",
+        "vmar_allocate",
+        "vmar_map",
+        "vmar_protect",
+        "vmar_unmap",
+        "vmar_destroy",
+        "process_builder_seal",
+        "process_builder_abort",
+        "pending_virtual_machine_install",
+        "guest_mapping_create",
+    ] {
+        let call = schema::INVOCATIONS
+            .iter()
+            .find(|call| call.name == name)
+            .ok_or_else(|| format!("missing invocation {name}"))?;
+        assert_eq!(call.blocking, schema::BlockingClass::MayBlock, "{name}");
+    }
+    Ok(())
+}
+
+#[test]
+fn suspension_validation_rejects_nonblocking_user_copy() -> Result<(), String> {
+    let mut calls = schema::INVOCATIONS.to_vec();
+    let call = calls
+        .iter_mut()
+        .find(|call| call.name == "file_read_at")
+        .ok_or("missing file_read_at invocation")?;
+    call.blocking = schema::BlockingClass::Never;
+    let candidate = AbiSchema {
+        invocations: Box::leak(calls.into_boxed_slice()),
+        ..schema::NATIVE_ABI
+    };
+    assert!(validate(&candidate).is_err());
+    Ok(())
+}

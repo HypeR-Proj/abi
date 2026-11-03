@@ -88,6 +88,17 @@ pub(super) fn validate_invocations(schema: &AbiSchema, supported_rights: u64) ->
         }
         validate_arguments(schema, invocation, supported_rights)?;
         validate_results(schema, invocation, supported_rights)?;
+        if invocation.blocking == schema::BlockingClass::Never
+            && invocation
+                .arguments
+                .iter()
+                .any(|argument| argument.memory.is_some())
+        {
+            return invalid(format!(
+                "invocation {} accesses faultable user memory and must allow suspension",
+                invocation.name
+            ));
+        }
     }
     Ok(())
 }
