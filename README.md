@@ -44,13 +44,17 @@ record layouts, rights and failure results.
 
 ## Use from Rust
 
-The `hyper-abi` crate is `#![no_std]` and has no dependencies. The kernel uses
-the in-tree package directly:
+The `hyper-abi` crate is `#![no_std]` and has no dependencies. In a repo-managed
+workspace, `kernel/core/Cargo.toml` consumes the source crate directly:
 
 ```toml
-[dependencies]
-hyper-abi = { path = "sdk/abi" }
+[dependencies.hyper-abi]
+path = "../../sdk/abi"
 ```
+
+Cargo resolves this path relative to `kernel/core/`, the directory containing
+that manifest. The result is the workspace's `sdk/abi/` checkout, not a path
+relative to the shell's current directory.
 
 ## Generate and verify
 
