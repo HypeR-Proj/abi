@@ -189,6 +189,18 @@ pub(super) fn invocation_documentation(invocation: &schema::Invocation) -> Strin
         "Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.\n\n"
     );
     output.push_str("Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.\n");
+    for failure in invocation.failure_results {
+        for result in failure.results {
+            let _ = writeln!(
+                output,
+                "On `{}`, auxiliary register {} is `{}: {}`.",
+                failure.status,
+                result.register,
+                result.name,
+                value_kind_name(result.kind)
+            );
+        }
+    }
     output
 }
 
@@ -341,7 +353,15 @@ fn joined_failure_statuses(invocation: &schema::Invocation, result_name: &str) -
     let statuses: Vec<_> = invocation
         .failure_results
         .iter()
-        .filter(|failure| failure.results.contains(&result_name))
+        .filter(|failure| {
+            failure.results.iter().any(|result| {
+                result.name == result_name
+                    && invocation
+                        .results
+                        .get(result.register)
+                        .is_some_and(|ok| ok.name == result.name && ok.kind == result.kind)
+            })
+        })
         .map(|failure| failure.status)
         .collect();
     if statuses.is_empty() {

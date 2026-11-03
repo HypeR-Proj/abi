@@ -71,6 +71,8 @@ pub const HYPER_NATIVE_STATUS_NO_SPACE: HyperNativeStatus = -24;
 pub const HYPER_NATIVE_STATUS_READ_ONLY: HyperNativeStatus = -25;
 /// Invocation status `revoked`. Auxiliary results on failure require an explicit method contract.
 pub const HYPER_NATIVE_STATUS_REVOKED: HyperNativeStatus = -26;
+/// Invocation status `transaction_rejected`. Auxiliary results on failure require an explicit method contract.
+pub const HYPER_NATIVE_STATUS_TRANSACTION_REJECTED: HyperNativeStatus = -27;
 
 /// Object-kind tag `none` used with an object-local operation number.
 pub const HYPER_NATIVE_OBJECT_NONE: u32 = 0;
@@ -2181,6 +2183,7 @@ pub const HYPER_NATIVE_OP_BYTE_CHANNEL_WRITE: u64 = 256;
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 ///
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+/// On `buffer_too_small`, auxiliary register 0 is `actual_bytes: byte_count`.
 pub const HYPER_NATIVE_OP_BYTE_CHANNEL_READ: u64 = 257;
 
 /// Object-local method `byte_channel_trace_rpc`.
@@ -2219,6 +2222,7 @@ pub const HYPER_NATIVE_OP_BYTE_CHANNEL_TRACE_RPC: u64 = 258;
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 ///
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+/// On `would_block`, auxiliary register 0 is `actual_bytes: byte_count`.
 pub const HYPER_NATIVE_OP_CONSOLE_READ: u64 = 256;
 
 /// Object-local method `console_write`.
@@ -2238,6 +2242,7 @@ pub const HYPER_NATIVE_OP_CONSOLE_READ: u64 = 256;
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 ///
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+/// On `would_block`, auxiliary register 0 is `actual_bytes: byte_count`.
 pub const HYPER_NATIVE_OP_CONSOLE_WRITE: u64 = 257;
 
 /// Object-local method `directory_open_file`.
@@ -2333,6 +2338,9 @@ pub const HYPER_NATIVE_OP_CAPABILITY_CHANNEL_TRY_SEND: u64 = 256;
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 ///
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+/// On `buffer_too_small`, auxiliary register 0 is `actual_bytes: byte_count`.
+/// On `buffer_too_small`, auxiliary register 1 is `actual_capabilities: element_count`.
+/// On `transaction_rejected`, auxiliary register 0 is `rejection_status: i64`.
 pub const HYPER_NATIVE_OP_CAPABILITY_CHANNEL_RECEIVE: u64 = 257;
 
 /// Object-local method `process_builder_create`.
@@ -7220,6 +7228,7 @@ impl NativeOperation {
             (Self::ConsoleRead, HYPER_NATIVE_STATUS_WOULD_BLOCK) => 1,
             (Self::ConsoleWrite, HYPER_NATIVE_STATUS_WOULD_BLOCK) => 1,
             (Self::CapabilityChannelReceive, HYPER_NATIVE_STATUS_BUFFER_TOO_SMALL) => 3,
+            (Self::CapabilityChannelReceive, HYPER_NATIVE_STATUS_TRANSACTION_REJECTED) => 1,
             _ => 0,
         }
     }

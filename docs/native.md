@@ -40,6 +40,7 @@ ABI revision: `0`.
 | -24 | `no_space` |
 | -25 | `read_only` |
 | -26 | `revoked` |
+| -27 | `transaction_rejected` |
 
 ## Object kinds
 
@@ -922,9 +923,10 @@ RISC-V ISA extensions accepted in guest configuration.
 - ProcessRetirement READY publishes a bounded scene; RELEASED is sticky and may occur before READY. The timeout starts on the first stop request, including quiescence time. Current limits are 64 armed registrations, four retained scenes and 64 MiB of retained page payload per registering supervisor, with at most 60 seconds per registration. Actual limits may tighten and quota/allocation failure is observable. At most 32 thread records, 256 numeric handle records and 1024 mapping records are retained; truncation is flagged. Bounded metadata is separately resource-domain charged. Controllers should be explicitly released after observation and before joining final process or group retirement.
 - CrashView grants only read/inspect and may be duplicated or delegated. Release revokes new reads even when views remain open; already admitted bounded reads may finish. Read copies at most 64 KiB and may return a contiguous short prefix before an unavailable page. Indexed thread, mapping and handle queries begin at zero and return next_index zero at the end; absent indices return NOT_FOUND. Thread machine is ELF e_machine; general, vector and fp_control byte arrays encode little-endian u64 words in architecture register order. Mapping object_koid zero means no canonical object identity is exported. Numeric addresses and KOIDs confer no authority.
 - Object transfer classes constrain generic capability transports. General objects may be retained by buffered or rendezvous transports. Rendezvous-only objects may move or duplicate only by a direct source-to-destination commit which never creates an in-transit owner. Forbidden objects cannot cross a userspace handle table boundary.
-- AtomicOnOk capability transactions commit handle-table ownership, the rendezvous message, and live output-handle installation together only when both participants return ok. Every non-ok status preserves all input owners and the message. Non-fault failures leave output memory unchanged; fault may partially modify output byte or slot memory, but no handle value written by a failed call is live or installed. Bindings must ignore every output-memory byte after any non-ok status.
+- AtomicOnOk capability transactions commit handle-table ownership, the rendezvous message, and live output-handle installation together only when both participants return ok. Every non-ok status preserves all input owners and the message. Non-fault failures leave output memory unchanged; fault (including transaction_rejected with rejection_status fault) may partially modify output byte or slot memory, but no handle value written by a failed call is live or installed. Bindings must ignore every output-memory byte after any non-ok status.
 - A capability-channel receiver advertises peer_receiving only after its byte range, typed capability slots, and destination handle-table capacity are validated, reserved, and fully published on the endpoint's FIFO receiver queue. The signal is level-triggered but may race another sender.
 - A capability disposition's rights are the sender's offered ceiling; capability_disposition_same_rights offers all source rights. A receive slot's rights are the exact installed grant, so receiver rights must be a subset of the sender offer and the offer a subset of source rights. Sender and receiver expected_kind values are nonzero and must both equal the actual object kind.
+- Capability receive distinguishes matched precommit rejection from receiver invocation, admission, endpoint and wait failures. A matched capacity rejection returns buffer_too_small with both required counts. Other matched rejections return transaction_rejected with auxiliary register 0 containing the signed original rejection status (i64 bit representation); register 1 is zero. The sender receives that original status. All rejected transactions preserve MOVE sources and install no destination handles, including late output faults. Receiver-local errors retain their ordinary status, never transaction_rejected or buffer_too_small. Rejection identifies a completed unsuccessful match, not necessarily bad peer input or a retryable error: fault, resource and internal failures need their own policy. Reposting a receiver is a new transaction, not continuation of the rejected send.
 - A capability receive slot enters with handle and flags zero. On ok, only handle changes. Implementations reserve destination entries, prewrite their future handle values, then perform an infallible handle-table commit. Buffer-too-small changes no slot or byte memory and reports both required counts.
 - Capability disposition move consumes its source only on ok and requires transfer. Capability disposition duplicate retains its source and requires transfer plus duplicate. Unknown operations, repeated source handles, kind mismatches, and rights violations reject the complete transaction.
 - Capability-channel try_send returns peer_closed when no peer remains; otherwise it returns would_block only when no receiver is queued. It FIFO-matches the oldest fully published receiver. A size, kind, rights, operation, or copy mismatch rejects that transaction for both participants without scanning later receivers.
@@ -1262,6 +1264,7 @@ Object-local method `byte_channel_read`.
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 
 Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+On `buffer_too_small`, auxiliary register 0 is `actual_bytes: byte_count`.
 
 ### `byte_channel_trace_rpc`
 
@@ -1302,6 +1305,7 @@ Object-local method `console_read`.
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 
 Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+On `would_block`, auxiliary register 0 is `actual_bytes: byte_count`.
 
 ### `console_write`
 
@@ -1322,6 +1326,7 @@ Object-local method `console_write`.
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 
 Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+On `would_block`, auxiliary register 0 is `actual_bytes: byte_count`.
 
 ### `directory_open_file`
 
@@ -1422,6 +1427,9 @@ Object-local method `capability_channel_receive`.
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 
 Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+On `buffer_too_small`, auxiliary register 0 is `actual_bytes: byte_count`.
+On `buffer_too_small`, auxiliary register 1 is `actual_capabilities: element_count`.
+On `transaction_rejected`, auxiliary register 0 is `rejection_status: i64`.
 
 ### `process_builder_create`
 

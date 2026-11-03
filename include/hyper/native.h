@@ -150,11 +150,13 @@
  *
  * - Object transfer classes constrain generic capability transports. General objects may be retained by buffered or rendezvous transports. Rendezvous-only objects may move or duplicate only by a direct source-to-destination commit which never creates an in-transit owner. Forbidden objects cannot cross a userspace handle table boundary.
  *
- * - AtomicOnOk capability transactions commit handle-table ownership, the rendezvous message, and live output-handle installation together only when both participants return ok. Every non-ok status preserves all input owners and the message. Non-fault failures leave output memory unchanged; fault may partially modify output byte or slot memory, but no handle value written by a failed call is live or installed. Bindings must ignore every output-memory byte after any non-ok status.
+ * - AtomicOnOk capability transactions commit handle-table ownership, the rendezvous message, and live output-handle installation together only when both participants return ok. Every non-ok status preserves all input owners and the message. Non-fault failures leave output memory unchanged; fault (including transaction_rejected with rejection_status fault) may partially modify output byte or slot memory, but no handle value written by a failed call is live or installed. Bindings must ignore every output-memory byte after any non-ok status.
  *
  * - A capability-channel receiver advertises peer_receiving only after its byte range, typed capability slots, and destination handle-table capacity are validated, reserved, and fully published on the endpoint's FIFO receiver queue. The signal is level-triggered but may race another sender.
  *
  * - A capability disposition's rights are the sender's offered ceiling; capability_disposition_same_rights offers all source rights. A receive slot's rights are the exact installed grant, so receiver rights must be a subset of the sender offer and the offer a subset of source rights. Sender and receiver expected_kind values are nonzero and must both equal the actual object kind.
+ *
+ * - Capability receive distinguishes matched precommit rejection from receiver invocation, admission, endpoint and wait failures. A matched capacity rejection returns buffer_too_small with both required counts. Other matched rejections return transaction_rejected with auxiliary register 0 containing the signed original rejection status (i64 bit representation); register 1 is zero. The sender receives that original status. All rejected transactions preserve MOVE sources and install no destination handles, including late output faults. Receiver-local errors retain their ordinary status, never transaction_rejected or buffer_too_small. Rejection identifies a completed unsuccessful match, not necessarily bad peer input or a retryable error: fault, resource and internal failures need their own policy. Reposting a receiver is a new transaction, not continuation of the rejected send.
  *
  * - A capability receive slot enters with handle and flags zero. On ok, only handle changes. Implementations reserve destination entries, prewrite their future handle values, then perform an infallible handle-table commit. Buffer-too-small changes no slot or byte memory and reports both required counts.
  *
@@ -363,6 +365,10 @@ typedef int64_t hyper_native_status_t;
  * Invocation status `revoked`. Auxiliary results on failure require an explicit method contract.
  */
 #define HYPER_NATIVE_STATUS_REVOKED (-INT64_C(26))
+/**
+ * Invocation status `transaction_rejected`. Auxiliary results on failure require an explicit method contract.
+ */
+#define HYPER_NATIVE_STATUS_TRANSACTION_REJECTED (-INT64_C(27))
 
 /**
  * Object-kind tag `none` used with an object-local operation number.
@@ -3747,6 +3753,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
  *
  * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ * On `buffer_too_small`, auxiliary register 0 is `actual_bytes: byte_count`.
  */
 #define HYPER_NATIVE_OP_BYTE_CHANNEL_READ UINT64_C(257)
 
@@ -3789,6 +3796,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
  *
  * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ * On `would_block`, auxiliary register 0 is `actual_bytes: byte_count`.
  */
 #define HYPER_NATIVE_OP_CONSOLE_READ UINT64_C(256)
 
@@ -3810,6 +3818,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
  *
  * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ * On `would_block`, auxiliary register 0 is `actual_bytes: byte_count`.
  */
 #define HYPER_NATIVE_OP_CONSOLE_WRITE UINT64_C(257)
 
@@ -3915,6 +3924,9 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
  *
  * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ * On `buffer_too_small`, auxiliary register 0 is `actual_bytes: byte_count`.
+ * On `buffer_too_small`, auxiliary register 1 is `actual_capabilities: element_count`.
+ * On `transaction_rejected`, auxiliary register 0 is `rejection_status: i64`.
  */
 #define HYPER_NATIVE_OP_CAPABILITY_CHANNEL_RECEIVE UINT64_C(257)
 
@@ -7684,6 +7696,11 @@ static inline uint64_t hyper_native_failure_result_mask(
         operation == HYPER_NATIVE_OP_CAPABILITY_CHANNEL_RECEIVE &&
         status == HYPER_NATIVE_STATUS_BUFFER_TOO_SMALL) {
         return UINT64_C(3);
+    }
+    if (object_kind == HYPER_NATIVE_OBJECT_CAPABILITY_CHANNEL &&
+        operation == HYPER_NATIVE_OP_CAPABILITY_CHANNEL_RECEIVE &&
+        status == HYPER_NATIVE_STATUS_TRANSACTION_REJECTED) {
+        return UINT64_C(1);
     }
     return UINT64_C(0);
 }

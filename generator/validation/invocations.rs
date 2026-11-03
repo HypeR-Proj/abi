@@ -471,13 +471,17 @@ fn validate_results(
             ));
         }
         let mut result_names = BTreeSet::new();
-        for name in failure.results {
-            if !result_names.insert(*name)
-                || !invocation.results.iter().any(|result| result.name == *name)
+        let mut registers = BTreeSet::new();
+        for result in failure.results {
+            validate_identifier("failure result", result.name)?;
+            if !result_names.insert(result.name)
+                || !registers.insert(result.register)
+                || result.register >= schema::INVOCATION_RESULT_REGISTERS
+                || result.kind == ValueKind::Handle
             {
                 return invalid(format!(
                     "invocation {} names invalid failure result {}",
-                    invocation.name, name
+                    invocation.name, result.name
                 ));
             }
         }

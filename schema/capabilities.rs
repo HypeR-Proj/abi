@@ -127,6 +127,10 @@ pub const STATUSES: &[Status] = &[
         value: -26,
         name: "revoked",
     },
+    Status {
+        value: -27,
+        name: "transaction_rejected",
+    },
 ];
 
 // Shared selector values for direct and record-based capability dispositions.

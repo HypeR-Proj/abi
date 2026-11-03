@@ -40,6 +40,16 @@ fn object_local_operations_decode_and_mask_failures_by_receiver_kind() {
             mask
         );
     }
+    assert_eq!(
+        NativeOperation::CapabilityChannelReceive
+            .failure_result_mask(generated::HYPER_NATIVE_STATUS_TRANSACTION_REJECTED),
+        1
+    );
+    assert_eq!(
+        NativeOperation::ByteChannelRead
+            .failure_result_mask(generated::HYPER_NATIVE_STATUS_TRANSACTION_REJECTED),
+        0
+    );
     assert_eq!(NativeOperation::ThreadCreate.argument_count(), 2);
     assert_eq!(NativeOperation::FileReadAt.argument_count(), 4);
     assert_eq!(
