@@ -229,8 +229,16 @@ pub(super) const fn invocation_receiver(kind: &'static str, required_rights: u64
 pub struct FailureResults {
     /// Name of a declared non-OK status.
     pub status: &'static str,
-    /// Names from the invocation's result list, not register numbers.
-    pub results: &'static [&'static str],
+    /// Failure-specific scalar outputs; names and types need not match OK outputs.
+    pub results: &'static [FailureResult],
+}
+
+/// One defined auxiliary register on failure. Failure never produces authority.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FailureResult {
+    pub register: usize,
+    pub name: &'static str,
+    pub kind: ValueKind,
 }
 
 /// Feature advertisement required by a method, distinct from kernel build cfg.

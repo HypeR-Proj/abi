@@ -384,7 +384,11 @@ fn rejects_failure_results_for_unknown_status() {
     let failures = Box::leak(
         vec![schema::FailureResults {
             status: "missing",
-            results: &["actual_bytes"],
+            results: &[schema::FailureResult {
+                register: 0,
+                name: "actual_bytes",
+                kind: schema::ValueKind::ByteCount,
+            }],
         }]
         .into_boxed_slice(),
     );
@@ -412,7 +416,11 @@ fn common_failure_results_accept_only_declared_receiver_kinds()
         .ok_or("missing common information method")?;
     call.failure_results = &[schema::FailureResults {
         status: "buffer_too_small",
-        results: &["supported_size"],
+        results: &[schema::FailureResult {
+            register: 0,
+            name: "supported_size",
+            kind: schema::ValueKind::ByteCount,
+        }],
     }];
     let candidate = AbiSchema {
         invocations: Box::leak(calls.into_boxed_slice()),
@@ -479,7 +487,11 @@ fn byte_channel_read_declares_buffer_size_result_on_failure() {
     assert_eq!(invocation.name, "byte_channel_read");
     assert_eq!(invocation.failure_results.len(), 1);
     assert_eq!(invocation.failure_results[0].status, "buffer_too_small");
-    assert_eq!(invocation.failure_results[0].results, &["actual_bytes"]);
+    assert_eq!(
+        invocation.failure_results[0].results[0].name,
+        "actual_bytes"
+    );
+    assert_eq!(invocation.failure_results[0].results[0].register, 0);
 }
 
 #[test]
@@ -1473,4 +1485,75 @@ fn rejects_record_stride_without_a_byte_count_parameter() {
     assert!(
         matches!(validate(&candidate), Err(Error::InvalidSchema(message)) if message.contains("invalid record stride"))
     );
+}
+
+#[test]
+fn failure_results_have_their_own_register_names_and_types()
+-> Result<(), Box<dyn std::error::Error>> {
+    let generated = generate(&schema::NATIVE_ABI)?;
+    assert!(generated.rust.contains(
+        "(Self::CapabilityChannelReceive, HYPER_NATIVE_STATUS_TRANSACTION_REJECTED) => 1"
+    ));
+    assert!(
+        generated
+            .rust
+            .contains("auxiliary register 0 is `rejection_status: i64`")
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_failure_registers_and_authority_outputs() {
+    for results in [
+        vec![schema::FailureResult {
+            register: 2,
+            name: "cause",
+            kind: schema::ValueKind::I64,
+        }],
+        vec![schema::FailureResult {
+            register: 0,
+            name: "owner",
+            kind: schema::ValueKind::Handle,
+        }],
+        vec![
+            schema::FailureResult {
+                register: 0,
+                name: "a",
+                kind: schema::ValueKind::U64,
+            },
+            schema::FailureResult {
+                register: 0,
+                name: "b",
+                kind: schema::ValueKind::U64,
+            },
+        ],
+        vec![
+            schema::FailureResult {
+                register: 0,
+                name: "a",
+                kind: schema::ValueKind::U64,
+            },
+            schema::FailureResult {
+                register: 1,
+                name: "a",
+                kind: schema::ValueKind::U64,
+            },
+        ],
+    ] {
+        let mut calls = schema::INVOCATIONS.to_vec();
+        calls[14].failure_results = Box::leak(
+            vec![schema::FailureResults {
+                status: "transaction_rejected",
+                results: Box::leak(results.into_boxed_slice()),
+            }]
+            .into_boxed_slice(),
+        );
+        let candidate = AbiSchema {
+            invocations: Box::leak(calls.into_boxed_slice()),
+            ..schema::NATIVE_ABI
+        };
+        assert!(
+            matches!(validate(&candidate), Err(Error::InvalidSchema(message)) if message.contains("invalid failure result"))
+        );
+    }
 }

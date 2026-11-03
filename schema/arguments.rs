@@ -389,7 +389,11 @@ pub(super) const CHANNEL_READ_RESULTS: &[ResultValue] = &[ResultValue {
     kind: ValueKind::ByteCount,
     handle: None,
 }];
-pub(super) const CHANNEL_READ_BUFFER_TOO_SMALL_RESULTS: &[&str] = &["actual_bytes"];
+pub(super) const CHANNEL_READ_BUFFER_TOO_SMALL_RESULTS: &[FailureResult] = &[FailureResult {
+    register: 0,
+    name: "actual_bytes",
+    kind: ValueKind::ByteCount,
+}];
 /// A short receive buffer reports the required byte count without consuming the
 /// queued message. Other failures leave the auxiliary count undefined.
 pub(super) const CHANNEL_READ_FAILURE_RESULTS: &[FailureResults] = &[FailureResults {
@@ -571,13 +575,32 @@ pub(super) const CAPABILITY_CHANNEL_RECEIVE_RESULTS: &[ResultValue] = &[
         handle: None,
     },
 ];
-pub(super) const CAPABILITY_CHANNEL_RECEIVE_BUFFER_TOO_SMALL_RESULTS: &[&str] =
-    &["actual_bytes", "actual_capabilities"];
-pub(super) const CAPABILITY_CHANNEL_RECEIVE_FAILURE_RESULTS: &[FailureResults] =
-    &[FailureResults {
+pub(super) const CAPABILITY_CHANNEL_RECEIVE_BUFFER_TOO_SMALL_RESULTS: &[FailureResult] = &[
+    FailureResult {
+        register: 0,
+        name: "actual_bytes",
+        kind: ValueKind::ByteCount,
+    },
+    FailureResult {
+        register: 1,
+        name: "actual_capabilities",
+        kind: ValueKind::ElementCount,
+    },
+];
+pub(super) const CAPABILITY_CHANNEL_RECEIVE_FAILURE_RESULTS: &[FailureResults] = &[
+    FailureResults {
         status: "buffer_too_small",
         results: CAPABILITY_CHANNEL_RECEIVE_BUFFER_TOO_SMALL_RESULTS,
-    }];
+    },
+    FailureResults {
+        status: "transaction_rejected",
+        results: &[FailureResult {
+            register: 0,
+            name: "rejection_status",
+            kind: ValueKind::I64,
+        }],
+    },
+];
 
 pub(super) const CONSOLE_READ_RECEIVER: Argument = Argument {
     name: "console",
@@ -662,7 +685,11 @@ pub(super) const CONSOLE_IO_RESULTS: &[ResultValue] = &[ResultValue {
     kind: ValueKind::ByteCount,
     handle: None,
 }];
-pub(super) const CONSOLE_IO_WOULD_BLOCK_RESULTS: &[&str] = &["actual_bytes"];
+pub(super) const CONSOLE_IO_WOULD_BLOCK_RESULTS: &[FailureResult] = &[FailureResult {
+    register: 0,
+    name: "actual_bytes",
+    kind: ValueKind::ByteCount,
+}];
 pub(super) const CONSOLE_IO_FAILURE_RESULTS: &[FailureResults] = &[FailureResults {
     status: "would_block",
     results: CONSOLE_IO_WOULD_BLOCK_RESULTS,

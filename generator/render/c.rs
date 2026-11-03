@@ -297,14 +297,8 @@ fn render_c_failure_result_mask(output: &mut String, schema: &AbiSchema) {
     for invocation in schema.invocations {
         for failure in invocation.failure_results {
             let mut mask = 0u64;
-            for result_name in failure.results {
-                if let Some(index) = invocation
-                    .results
-                    .iter()
-                    .position(|result| result.name == *result_name)
-                {
-                    mask |= 1u64 << index;
-                }
+            for result in failure.results {
+                mask |= 1u64 << result.register;
             }
             if let Some(schema::ObjectConstraint::Kind(kind)) =
                 invocation.receiver.handle.map(|handle| handle.object)
