@@ -163,7 +163,7 @@ File-open options; EXCLUSIVE requires CREATE.
 
 ### `file_time` (flags)
 
-Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
 
 | Name | Value | Meaning |
 | --- | ---: | --- |
@@ -174,7 +174,7 @@ Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
 
 ### `file_update` (flags)
 
-Selected fields in file_metadata_update.mask; unselected fields are zero.
+Selected fields in `file_metadata_update.mask`; unselected fields are zero.
 
 | Name | Value | Meaning |
 | --- | ---: | --- |
@@ -184,7 +184,7 @@ Selected fields in file_metadata_update.mask; unselected fields are zero.
 
 ### `file_sync` (enum)
 
-Durability scope passed to file_sync.
+Durability scope passed to `file_sync`.
 
 | Name | Value | Meaning |
 | --- | ---: | --- |

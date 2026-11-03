@@ -996,34 +996,34 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
 /**
  * @defgroup hyper_native_file_time file_time (flags)
  * @ingroup hyper_native
- * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
  * @{
  */
 /**
  * `file_time_accessed` in the `file_time` flags domain.
  *
- * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_TIME_ACCESSED UINT64_C(1)
 /**
  * `file_time_modified` in the `file_time` flags domain.
  *
- * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_TIME_MODIFIED UINT64_C(2)
 /**
  * `file_time_created` in the `file_time` flags domain.
  *
- * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_TIME_CREATED UINT64_C(4)
 /**
  * `file_time_changed` in the `file_time` flags domain.
  *
- * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_TIME_CHANGED UINT64_C(8)
@@ -1032,27 +1032,27 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
 /**
  * @defgroup hyper_native_file_update file_update (flags)
  * @ingroup hyper_native
- * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * Selected fields in `file_metadata_update.mask`; unselected fields are zero.
  * @{
  */
 /**
  * `file_update_mode` in the `file_update` flags domain.
  *
- * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * Selected fields in `file_metadata_update.mask`; unselected fields are zero.
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_UPDATE_MODE UINT64_C(1)
 /**
  * `file_update_accessed` in the `file_update` flags domain.
  *
- * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * Selected fields in `file_metadata_update.mask`; unselected fields are zero.
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_UPDATE_ACCESSED UINT64_C(2)
 /**
  * `file_update_modified` in the `file_update` flags domain.
  *
- * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * Selected fields in `file_metadata_update.mask`; unselected fields are zero.
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_UPDATE_MODIFIED UINT64_C(4)
@@ -1061,20 +1061,20 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
 /**
  * @defgroup hyper_native_file_sync file_sync (enum)
  * @ingroup hyper_native
- * Durability scope passed to file_sync.
+ * Durability scope passed to `file_sync`.
  * @{
  */
 /**
  * `file_sync_data` in the `file_sync` enum domain.
  *
- * Durability scope passed to file_sync.
+ * Durability scope passed to `file_sync`.
  * Select one value; this is not a bit mask.
  */
 #define HYPER_NATIVE_FILE_SYNC_DATA UINT64_C(0)
 /**
  * `file_sync_all` in the `file_sync` enum domain.
  *
- * Durability scope passed to file_sync.
+ * Durability scope passed to `file_sync`.
  * Select one value; this is not a bit mask.
  */
 #define HYPER_NATIVE_FILE_SYNC_ALL UINT64_C(1)

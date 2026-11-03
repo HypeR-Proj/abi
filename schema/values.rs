@@ -83,7 +83,7 @@ constant_groups! {
         file_open_truncate = 1 << 2,
     }
 
-    /// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+    /// Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
     flags file_time {
         file_time_accessed = 1 << 0,
         file_time_modified = 1 << 1,
@@ -91,14 +91,14 @@ constant_groups! {
         file_time_changed = 1 << 3,
     }
 
-    /// Selected fields in file_metadata_update.mask; unselected fields are zero.
+    /// Selected fields in `file_metadata_update.mask`; unselected fields are zero.
     flags file_update {
         file_update_mode = 1 << 0,
         file_update_accessed = 1 << 1,
         file_update_modified = 1 << 2,
     }
 
-    /// Durability scope passed to file_sync.
+    /// Durability scope passed to `file_sync`.
     enum file_sync {
         file_sync_data = 0,
         file_sync_all = 1,

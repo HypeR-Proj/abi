@@ -416,49 +416,49 @@ pub const HYPER_NATIVE_FILE_OPEN_TRUNCATE: u64 = 4;
 
 /// `file_time_accessed` in the `file_time` flags domain.
 ///
-/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_TIME_ACCESSED: u64 = 1;
 /// `file_time_modified` in the `file_time` flags domain.
 ///
-/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_TIME_MODIFIED: u64 = 2;
 /// `file_time_created` in the `file_time` flags domain.
 ///
-/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_TIME_CREATED: u64 = 4;
 /// `file_time_changed` in the `file_time` flags domain.
 ///
-/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Valid timestamp fields in `file_metadata.valid_times`; absent fields are zero.
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_TIME_CHANGED: u64 = 8;
 
 /// `file_update_mode` in the `file_update` flags domain.
 ///
-/// Selected fields in file_metadata_update.mask; unselected fields are zero.
+/// Selected fields in `file_metadata_update.mask`; unselected fields are zero.
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_UPDATE_MODE: u64 = 1;
 /// `file_update_accessed` in the `file_update` flags domain.
 ///
-/// Selected fields in file_metadata_update.mask; unselected fields are zero.
+/// Selected fields in `file_metadata_update.mask`; unselected fields are zero.
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_UPDATE_ACCESSED: u64 = 2;
 /// `file_update_modified` in the `file_update` flags domain.
 ///
-/// Selected fields in file_metadata_update.mask; unselected fields are zero.
+/// Selected fields in `file_metadata_update.mask`; unselected fields are zero.
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_UPDATE_MODIFIED: u64 = 4;
 
 /// `file_sync_data` in the `file_sync` enum domain.
 ///
-/// Durability scope passed to file_sync.
+/// Durability scope passed to `file_sync`.
 /// Select one value; this is not a bit mask.
 pub const HYPER_NATIVE_FILE_SYNC_DATA: u64 = 0;
 /// `file_sync_all` in the `file_sync` enum domain.
 ///
-/// Durability scope passed to file_sync.
+/// Durability scope passed to `file_sync`.
 /// Select one value; this is not a bit mask.
 pub const HYPER_NATIVE_FILE_SYNC_ALL: u64 = 1;
 
