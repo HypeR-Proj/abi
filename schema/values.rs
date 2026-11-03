@@ -83,6 +83,38 @@ constant_groups! {
         file_open_truncate = 1 << 2,
     }
 
+    /// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+    flags file_time {
+        file_time_accessed = 1 << 0,
+        file_time_modified = 1 << 1,
+        file_time_created = 1 << 2,
+        file_time_changed = 1 << 3,
+    }
+
+    /// Selected fields in file_metadata_update.mask; unselected fields are zero.
+    flags file_update {
+        file_update_mode = 1 << 0,
+        file_update_accessed = 1 << 1,
+        file_update_modified = 1 << 2,
+    }
+
+    /// Durability scope passed to file_sync.
+    enum file_sync {
+        file_sync_data = 0,
+        file_sync_all = 1,
+    }
+
+    /// Advisory file lock mode; deadlines control waiting independently.
+    enum file_lock {
+        file_lock_shared = 0,
+        file_lock_exclusive = 1,
+    }
+
+    /// Final-component lookup policy for directory metadata operations.
+    flags metadata_lookup {
+        metadata_lookup_nofollow = 1 << 0,
+    }
+
     /// Directory traversal options.
     flags directory_open {
         /// Reject a symbolic link in the final path component.

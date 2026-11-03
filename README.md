@@ -160,3 +160,9 @@ python3 project.py test abi
 
 Paths in the documentation are relative to the repo-managed workspace root.
 Edit this repository and prepare the workspace again before building.
+
+Suspension metadata covers user-buffer page-in and copy-on-write, allocation
+reclaim, and mapping transaction waits. `Never` describes suspension semantics,
+not latency or an IRQ-disabled entry path. The generator rejects faultable
+user-buffer methods declared `Never`. Filesystem timestamp, update, lookup,
+sync and lock values are exported from the schema for both C and Rust consumers.

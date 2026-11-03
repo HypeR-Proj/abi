@@ -16,6 +16,8 @@
 /**
  * @page hyper_native_contract Native ABI semantic contract
  *
+ * - MayBlock includes memory reclaim, file page-in and private-copy resolution during user-buffer access. A nonblocking channel operation does not wait for queue availability, but accessing a valid demand-paged buffer can still suspend its caller. Never is not a latency bound or authorization for an IRQ-disabled dispatch path. All Native invocations currently enter a sleepable kernel context; only individually audited methods without user-memory access or other suspension paths may declare Never.
+ *
  * - ABI revision is a major compatibility generation, not a build number: additive operations, supported flags and record tails do not require changing it. Revision zero remains explicitly unstable until release. The receiver and operation are separate from six u64 argument registers and two auxiliary result registers. At least one argument register remains reserved in current signatures. All unused registers and reserved input fields must be zero; unknown option bits are INVALID_ARGUMENT. New operations or selectors unsupported by an older kernel return NOT_SUPPORTED where specified; callers must not infer runtime feature availability solely from ABI revision.
  *
  * - Extensible input records carry an explicit byte size bounded by EXTENSIBLE_RECORD_MAX_BYTES. A supported historical prefix remains valid; omitted known trailing fields default to zero and unknown supplied trailing bytes must be zero. Validation and copying precede side effects. Output records report their supported size where specified and never write beyond the caller's accepted prefix. C veneers accept caller-supplied sizes rather than deriving the caller's allocation size inside a shared library. SDK convenience functions may choose default options; they do not define additional machine operations.
@@ -989,6 +991,130 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Independent flag bit; combine permitted members with bitwise OR.
  */
 #define HYPER_NATIVE_FILE_OPEN_TRUNCATE UINT64_C(4)
+/** @} */
+
+/**
+ * @defgroup hyper_native_file_time file_time (flags)
+ * @ingroup hyper_native
+ * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * @{
+ */
+/**
+ * `file_time_accessed` in the `file_time` flags domain.
+ *
+ * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_FILE_TIME_ACCESSED UINT64_C(1)
+/**
+ * `file_time_modified` in the `file_time` flags domain.
+ *
+ * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_FILE_TIME_MODIFIED UINT64_C(2)
+/**
+ * `file_time_created` in the `file_time` flags domain.
+ *
+ * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_FILE_TIME_CREATED UINT64_C(4)
+/**
+ * `file_time_changed` in the `file_time` flags domain.
+ *
+ * Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_FILE_TIME_CHANGED UINT64_C(8)
+/** @} */
+
+/**
+ * @defgroup hyper_native_file_update file_update (flags)
+ * @ingroup hyper_native
+ * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * @{
+ */
+/**
+ * `file_update_mode` in the `file_update` flags domain.
+ *
+ * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_FILE_UPDATE_MODE UINT64_C(1)
+/**
+ * `file_update_accessed` in the `file_update` flags domain.
+ *
+ * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_FILE_UPDATE_ACCESSED UINT64_C(2)
+/**
+ * `file_update_modified` in the `file_update` flags domain.
+ *
+ * Selected fields in file_metadata_update.mask; unselected fields are zero.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_FILE_UPDATE_MODIFIED UINT64_C(4)
+/** @} */
+
+/**
+ * @defgroup hyper_native_file_sync file_sync (enum)
+ * @ingroup hyper_native
+ * Durability scope passed to file_sync.
+ * @{
+ */
+/**
+ * `file_sync_data` in the `file_sync` enum domain.
+ *
+ * Durability scope passed to file_sync.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_FILE_SYNC_DATA UINT64_C(0)
+/**
+ * `file_sync_all` in the `file_sync` enum domain.
+ *
+ * Durability scope passed to file_sync.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_FILE_SYNC_ALL UINT64_C(1)
+/** @} */
+
+/**
+ * @defgroup hyper_native_file_lock file_lock (enum)
+ * @ingroup hyper_native
+ * Advisory file lock mode; deadlines control waiting independently.
+ * @{
+ */
+/**
+ * `file_lock_shared` in the `file_lock` enum domain.
+ *
+ * Advisory file lock mode; deadlines control waiting independently.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_FILE_LOCK_SHARED UINT64_C(0)
+/**
+ * `file_lock_exclusive` in the `file_lock` enum domain.
+ *
+ * Advisory file lock mode; deadlines control waiting independently.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_FILE_LOCK_EXCLUSIVE UINT64_C(1)
+/** @} */
+
+/**
+ * @defgroup hyper_native_metadata_lookup metadata_lookup (flags)
+ * @ingroup hyper_native
+ * Final-component lookup policy for directory metadata operations.
+ * @{
+ */
+/**
+ * `metadata_lookup_nofollow` in the `metadata_lookup` flags domain.
+ *
+ * Final-component lookup policy for directory metadata operations.
+ * Independent flag bit; combine permitted members with bitwise OR.
+ */
+#define HYPER_NATIVE_METADATA_LOOKUP_NOFOLLOW UINT64_C(1)
 /** @} */
 
 /**
@@ -3539,7 +3665,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `handle: Borrow, any, rights=0x0` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=handle_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3560,7 +3686,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `handle: Borrow, any, rights=0x8` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=object_basic_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3728,7 +3854,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `endpoint: Borrow, kind=byte_channel, rights=0x20` |
  * | User memory | `bytes: Read, len=byte_count bytes, max-bytes=65536; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3749,7 +3875,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `actual_bytes: byte_count; also-on=buffer_too_small` |
  * | Capability effects | `endpoint: Borrow, kind=byte_channel, rights=0x10` |
  * | User memory | `bytes: Write, len=byte_capacity bytes, max-bytes=65536; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3792,7 +3918,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `actual_bytes: byte_count; also-on=would_block` |
  * | Capability effects | `console: Borrow, kind=console, rights=0x10` |
  * | User memory | `bytes: Write, len=byte_capacity bytes, max-bytes=4096; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3814,7 +3940,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `actual_bytes: byte_count; also-on=would_block` |
  * | Capability effects | `console: Borrow, kind=console, rights=0x20` |
  * | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3899,7 +4025,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `endpoint: Borrow, kind=capability_channel, rights=0x20` |
  * | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0`, `dispositions: Read, len=disposition_count elements, max-elements=16, element-size=24, record=capability_disposition, transactional-handles=(handle, rights, expected_kind, operation), common-rights=0x2, operations=[move=0:ConsumeOnCommit/rights=0x2+duplicate=1:Borrow/rights=0x3], commit=AtomicOnOk; order=1` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3965,7 +4091,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
  * | User memory | `name: Read, len=name_size bytes, max-bytes=64; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3986,7 +4112,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
  * | User memory | `data: Read, len=data_size bytes, max-bytes=16384; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4007,7 +4133,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
  * | User memory | `affinity_words: Read, len=word_count elements, max-elements=4, element-size=8; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4049,7 +4175,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4091,7 +4217,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `builder: ConsumeOnCommit, kind=process_builder, rights=0x800` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4154,7 +4280,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `process: Borrow, kind=process, rights=0x8` |
  * | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=process_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4175,7 +4301,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `count: element_count`, `next_cursor: u64` |
  * | Capability effects | `inspector: Borrow, kind=task_inspector, rights=0x8` |
  * | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=task_process; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4196,7 +4322,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `count: element_count`, `next_cursor: u64` |
  * | Capability effects | `inspector: Borrow, kind=task_inspector, rights=0x8` |
  * | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=task_thread; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4238,7 +4364,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `count: element_count`, `next_cursor: u64` |
  * | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x8` |
  * | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=object_inspection; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4259,7 +4385,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `count: element_count`, `next_cursor: u64` |
  * | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x8` |
  * | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=handle_inspection; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4406,7 +4532,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `vmo: handle` |
  * | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x7b` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4427,7 +4553,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `vmo: Borrow, kind=vmo, rights=0x10` |
  * | User memory | `bytes: Write, len=byte_count bytes, max-bytes=65536; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4448,7 +4574,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `vmo: Borrow, kind=vmo, rights=0x20` |
  * | User memory | `bytes: Read, len=byte_count bytes, max-bytes=65536; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4469,7 +4595,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `child: handle`, `address: u64` |
  * | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `child: produce, kind=vmar, fixed=0x4b, inherited-from(vmar), mask=0x1000000000` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4490,7 +4616,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `vmo: Borrow, kind=vmo, rights=0x40` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4511,7 +4637,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4532,7 +4658,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4553,7 +4679,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `vmar: ConsumeOnCommit, kind=vmar, rights=0x40` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4595,7 +4721,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `inspector: Borrow, kind=memory_inspector, rights=0x8` |
  * | User memory | `observation: Write, len=observation_size bytes, max-bytes=4096, record=memory_observation; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4658,7 +4784,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x200000000` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=192; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4679,7 +4805,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `generation: u64` |
  * | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x80000000` |
  * | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=trace_config; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4742,7 +4868,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x200000000` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=2656; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4763,7 +4889,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x8` |
  * | User memory | `observation: Write, len=observation_size bytes, max-bytes=4096, record=cpu_observation; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4847,7 +4973,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `pending_virtual_machine: handle` |
  * | Capability effects | `lease: ConsumeOnCommit, kind=virtual_machine_creation_lease, rights=0x20000000`, `pending_virtual_machine: produce, kind=pending_virtual_machine, fixed=0xc2a, inherited-from(lease), mask=0xf0000000000` |
  * | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=virtual_machine_configuration; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4889,7 +5015,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `pending_virtual_machine: Borrow, kind=pending_virtual_machine, rights=0x20` |
  * | User memory | `bootstrap: Read, len=bootstrap_size bytes, max-bytes=4096, record=virtual_cpu_bootstrap; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4931,7 +5057,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `virtual_machine: handle`, `boot_virtual_cpu: handle` |
  * | Capability effects | `pending_virtual_machine: ConsumeOnCommit, kind=pending_virtual_machine, rights=0x400`, `virtual_machine: produce, kind=virtual_machine, fixed=0x82e, inherited-from(pending_virtual_machine), mask=0xf0000000000`, `boot_virtual_cpu: produce, kind=virtual_cpu, fixed=0x1000000042e, inherited-from(pending_virtual_machine), mask=0xe0000000000` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4994,7 +5120,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `virtual_machine: Borrow, kind=virtual_machine, rights=0x8` |
  * | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_machine_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5015,7 +5141,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x8` |
  * | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_cpu_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5036,7 +5162,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `child: handle` |
  * | Capability effects | `parent: Borrow, kind=resource_domain, rights=0x800000`, `child: produce, kind=resource_domain, fixed=0x984000b` |
  * | User memory | `limits: Read, len=limits_size bytes, max-bytes=4096, record=resource_limits; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5183,7 +5309,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `actual_bytes: byte_count` |
  * | Capability effects | `virtual_serial: Borrow, kind=virtual_serial, rights=0x20` |
  * | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5204,7 +5330,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `thread: handle` |
  * | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x200000`, `thread: produce, kind=thread, fixed=0x10000000c0f, inherited-from(receiver), mask=0xe0000000000` |
  * | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=thread_create_request; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5897,7 +6023,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `lease: Borrow, kind=virtual_machine_creation_lease, rights=0x8` |
  * | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_machine_platform_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5960,7 +6086,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `virtual_machine: Borrow, kind=virtual_machine, rights=0x20` |
  * | User memory | `request: Write, len=request_size bytes, max-bytes=4096, record=virtual_machine_power_request; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6044,7 +6170,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x20` |
  * | User memory | `request: Write, len=request_size bytes, max-bytes=4096, record=virtual_cpu_mmio_request; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6149,7 +6275,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=physical_device_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6170,7 +6296,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x10000`, `vmo: Borrow, kind=vmo, rights=0x50` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=dma_extent; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6233,7 +6359,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `mailbox: Borrow, kind=guest_mailbox, rights=0x20` |
  * | User memory | `bytes: Read, len=length bytes, max-bytes=256; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6254,7 +6380,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `bytes: byte_count` |
  * | Capability effects | `mailbox: Borrow, kind=guest_mailbox, rights=0x10` |
  * | User memory | `bytes: Write, len=capacity bytes, max-bytes=256; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6380,7 +6506,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `mapping: handle`, `token: u64` |
  * | Capability effects | `backend: Borrow, kind=virtual_machine, rights=0x20`, `memory: Borrow, kind=guest_memory, rights=0x40`, `mapping: produce, kind=guest_mapping, fixed=0x2a` |
  * | User memory | — |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6422,7 +6548,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `physical_device: handle` |
  * | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8000`, `physical_device: produce, kind=physical_device, fixed=0x800f` |
  * | User memory | `identity: Read, len=length bytes, max-bytes=512; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6443,7 +6569,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_profile_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6464,7 +6590,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_resource_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6485,7 +6611,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `value: u64` |
  * | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8` |
  * | User memory | `query: Read, len=query_size bytes, max-bytes=4096, record=device_firmware_query; order=0`, `output: Write, len=capacity bytes, max-bytes=65536; order=1` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6506,7 +6632,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `physical_device: handle` |
  * | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8000`, `physical_device: produce, kind=physical_device, fixed=0x2803f` |
  * | User memory | `entries: Read, len=count elements, max-elements=8, element-size=16, record=device_bundle_entry; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6590,7 +6716,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x20` |
  * | User memory | `affinity_words: Read, len=word_count elements, max-elements=4, element-size=8; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -6632,7 +6758,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x200000008` |
  * | User memory | `record: Write, len=record_size bytes, max-bytes=4096, record=object_details; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7094,7 +7220,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `inspector: Borrow, kind=memory_inspector, rights=0x8` |
  * | User memory | `statistics: Write, len=statistics_size bytes, max-bytes=4096; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Object` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7304,7 +7430,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x20` |
  * | User memory | `name: Read, len=name_size bytes, max-bytes=64; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7325,7 +7451,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `device: Borrow, kind=physical_device, rights=0x8008` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_dma_fault_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7367,7 +7493,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x8` |
  * | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7388,7 +7514,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x0` |
  * | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7409,7 +7535,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `receiver: Borrow, kind=thread, rights=0x8` |
  * | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7430,7 +7556,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `receiver: Borrow, kind=thread, rights=0x0` |
  * | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7451,7 +7577,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `receiver: Borrow, kind=virtual_cpu, rights=0x8` |
  * | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7472,7 +7598,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `receiver: Borrow, kind=virtual_cpu, rights=0x0` |
  * | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7493,7 +7619,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | — |
  * | Capability effects | `receiver: Borrow, kind=process_builder, rights=0x0` |
  * | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Task` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -7598,7 +7724,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Results | `supported_size: byte_count` |
  * | Capability effects | `receiver: Borrow, kind=block_queue, rights=0x8` |
  * | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=block_queue_info; order=0` |
- * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
  * | Audit | `Capability` |
  *
  * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.

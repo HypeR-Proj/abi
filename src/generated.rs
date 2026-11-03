@@ -414,6 +414,71 @@ pub const HYPER_NATIVE_FILE_OPEN_EXCLUSIVE: u64 = 2;
 /// Independent flag bit; combine permitted members with bitwise OR.
 pub const HYPER_NATIVE_FILE_OPEN_TRUNCATE: u64 = 4;
 
+/// `file_time_accessed` in the `file_time` flags domain.
+///
+/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_FILE_TIME_ACCESSED: u64 = 1;
+/// `file_time_modified` in the `file_time` flags domain.
+///
+/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_FILE_TIME_MODIFIED: u64 = 2;
+/// `file_time_created` in the `file_time` flags domain.
+///
+/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_FILE_TIME_CREATED: u64 = 4;
+/// `file_time_changed` in the `file_time` flags domain.
+///
+/// Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_FILE_TIME_CHANGED: u64 = 8;
+
+/// `file_update_mode` in the `file_update` flags domain.
+///
+/// Selected fields in file_metadata_update.mask; unselected fields are zero.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_FILE_UPDATE_MODE: u64 = 1;
+/// `file_update_accessed` in the `file_update` flags domain.
+///
+/// Selected fields in file_metadata_update.mask; unselected fields are zero.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_FILE_UPDATE_ACCESSED: u64 = 2;
+/// `file_update_modified` in the `file_update` flags domain.
+///
+/// Selected fields in file_metadata_update.mask; unselected fields are zero.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_FILE_UPDATE_MODIFIED: u64 = 4;
+
+/// `file_sync_data` in the `file_sync` enum domain.
+///
+/// Durability scope passed to file_sync.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_FILE_SYNC_DATA: u64 = 0;
+/// `file_sync_all` in the `file_sync` enum domain.
+///
+/// Durability scope passed to file_sync.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_FILE_SYNC_ALL: u64 = 1;
+
+/// `file_lock_shared` in the `file_lock` enum domain.
+///
+/// Advisory file lock mode; deadlines control waiting independently.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_FILE_LOCK_SHARED: u64 = 0;
+/// `file_lock_exclusive` in the `file_lock` enum domain.
+///
+/// Advisory file lock mode; deadlines control waiting independently.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_FILE_LOCK_EXCLUSIVE: u64 = 1;
+
+/// `metadata_lookup_nofollow` in the `metadata_lookup` flags domain.
+///
+/// Final-component lookup policy for directory metadata operations.
+/// Independent flag bit; combine permitted members with bitwise OR.
+pub const HYPER_NATIVE_METADATA_LOOKUP_NOFOLLOW: u64 = 1;
+
 /// `directory_open_nofollow` in the `directory_open` flags domain.
 ///
 /// Directory traversal options.
@@ -1987,7 +2052,7 @@ pub const HYPER_NATIVE_OP_HANDLE_REPLACE: u64 = 2;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `handle: Borrow, any, rights=0x0` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=handle_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2006,7 +2071,7 @@ pub const HYPER_NATIVE_OP_HANDLE_GET_INFO: u64 = 3;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `handle: Borrow, any, rights=0x8` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=object_basic_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2158,7 +2223,7 @@ pub const HYPER_NATIVE_OP_BYTE_CHANNEL_CREATE: u64 = 257;
 /// | Results | — |
 /// | Capability effects | `endpoint: Borrow, kind=byte_channel, rights=0x20` |
 /// | User memory | `bytes: Read, len=byte_count bytes, max-bytes=65536; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2177,7 +2242,7 @@ pub const HYPER_NATIVE_OP_BYTE_CHANNEL_WRITE: u64 = 256;
 /// | Results | `actual_bytes: byte_count; also-on=buffer_too_small` |
 /// | Capability effects | `endpoint: Borrow, kind=byte_channel, rights=0x10` |
 /// | User memory | `bytes: Write, len=byte_capacity bytes, max-bytes=65536; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2216,7 +2281,7 @@ pub const HYPER_NATIVE_OP_BYTE_CHANNEL_TRACE_RPC: u64 = 258;
 /// | Results | `actual_bytes: byte_count; also-on=would_block` |
 /// | Capability effects | `console: Borrow, kind=console, rights=0x10` |
 /// | User memory | `bytes: Write, len=byte_capacity bytes, max-bytes=4096; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2236,7 +2301,7 @@ pub const HYPER_NATIVE_OP_CONSOLE_READ: u64 = 256;
 /// | Results | `actual_bytes: byte_count; also-on=would_block` |
 /// | Capability effects | `console: Borrow, kind=console, rights=0x20` |
 /// | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2313,7 +2378,7 @@ pub const HYPER_NATIVE_OP_CAPABILITY_CHANNEL_CREATE: u64 = 258;
 /// | Results | — |
 /// | Capability effects | `endpoint: Borrow, kind=capability_channel, rights=0x20` |
 /// | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0`, `dispositions: Read, len=disposition_count elements, max-elements=16, element-size=24, record=capability_disposition, transactional-handles=(handle, rights, expected_kind, operation), common-rights=0x2, operations=[move=0:ConsumeOnCommit/rights=0x2+duplicate=1:Borrow/rights=0x3], commit=AtomicOnOk; order=1` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2373,7 +2438,7 @@ pub const HYPER_NATIVE_OP_PROCESS_BUILDER_CREATE: u64 = 256;
 /// | Results | — |
 /// | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 /// | User memory | `name: Read, len=name_size bytes, max-bytes=64; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2392,7 +2457,7 @@ pub const HYPER_NATIVE_OP_PROCESS_BUILDER_SET_NAME: u64 = 256;
 /// | Results | — |
 /// | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 /// | User memory | `data: Read, len=data_size bytes, max-bytes=16384; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2411,7 +2476,7 @@ pub const HYPER_NATIVE_OP_PROCESS_BUILDER_SET_DATA: u64 = 257;
 /// | Results | — |
 /// | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 /// | User memory | `affinity_words: Read, len=word_count elements, max-elements=4, element-size=8; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2449,7 +2514,7 @@ pub const HYPER_NATIVE_OP_PROCESS_BUILDER_ADD_HANDLE: u64 = 259;
 /// | Results | — |
 /// | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2487,7 +2552,7 @@ pub const HYPER_NATIVE_OP_PROCESS_BUILDER_START: u64 = 261;
 /// | Results | — |
 /// | Capability effects | `builder: ConsumeOnCommit, kind=process_builder, rights=0x800` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2544,7 +2609,7 @@ pub const HYPER_NATIVE_OP_OBJECT_WAIT_MANY: u64 = 259;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `process: Borrow, kind=process, rights=0x8` |
 /// | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=process_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2563,7 +2628,7 @@ pub const HYPER_NATIVE_OP_PROCESS_GET_INFO: u64 = 257;
 /// | Results | `count: element_count`, `next_cursor: u64` |
 /// | Capability effects | `inspector: Borrow, kind=task_inspector, rights=0x8` |
 /// | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=task_process; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2582,7 +2647,7 @@ pub const HYPER_NATIVE_OP_TASK_INSPECTOR_SCAN_PROCESSES: u64 = 256;
 /// | Results | `count: element_count`, `next_cursor: u64` |
 /// | Capability effects | `inspector: Borrow, kind=task_inspector, rights=0x8` |
 /// | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=task_thread; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2620,7 +2685,7 @@ pub const HYPER_NATIVE_OP_TASK_INSPECTOR_DERIVE_PROCESS: u64 = 258;
 /// | Results | `count: element_count`, `next_cursor: u64` |
 /// | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x8` |
 /// | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=object_inspection; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2639,7 +2704,7 @@ pub const HYPER_NATIVE_OP_OBJECT_INSPECTOR_SCAN_OBJECTS: u64 = 256;
 /// | Results | `count: element_count`, `next_cursor: u64` |
 /// | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x8` |
 /// | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=handle_inspection; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2772,7 +2837,7 @@ pub const HYPER_NATIVE_OP_DIRECTORY_OPEN_DIRECTORY: u64 = 257;
 /// | Results | `vmo: handle` |
 /// | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x7b` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2791,7 +2856,7 @@ pub const HYPER_NATIVE_OP_VMO_CREATE: u64 = 259;
 /// | Results | — |
 /// | Capability effects | `vmo: Borrow, kind=vmo, rights=0x10` |
 /// | User memory | `bytes: Write, len=byte_count bytes, max-bytes=65536; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2810,7 +2875,7 @@ pub const HYPER_NATIVE_OP_VMO_READ: u64 = 256;
 /// | Results | — |
 /// | Capability effects | `vmo: Borrow, kind=vmo, rights=0x20` |
 /// | User memory | `bytes: Read, len=byte_count bytes, max-bytes=65536; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2829,7 +2894,7 @@ pub const HYPER_NATIVE_OP_VMO_WRITE: u64 = 257;
 /// | Results | `child: handle`, `address: u64` |
 /// | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `child: produce, kind=vmar, fixed=0x4b, inherited-from(vmar), mask=0x1000000000` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2848,7 +2913,7 @@ pub const HYPER_NATIVE_OP_VMAR_ALLOCATE: u64 = 256;
 /// | Results | — |
 /// | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `vmo: Borrow, kind=vmo, rights=0x40` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2867,7 +2932,7 @@ pub const HYPER_NATIVE_OP_VMAR_MAP: u64 = 257;
 /// | Results | — |
 /// | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2886,7 +2951,7 @@ pub const HYPER_NATIVE_OP_VMAR_PROTECT: u64 = 258;
 /// | Results | — |
 /// | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2905,7 +2970,7 @@ pub const HYPER_NATIVE_OP_VMAR_UNMAP: u64 = 259;
 /// | Results | — |
 /// | Capability effects | `vmar: ConsumeOnCommit, kind=vmar, rights=0x40` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2943,7 +3008,7 @@ pub const HYPER_NATIVE_OP_DIRECTORY_READ: u64 = 256;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `inspector: Borrow, kind=memory_inspector, rights=0x8` |
 /// | User memory | `observation: Write, len=observation_size bytes, max-bytes=4096, record=memory_observation; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3000,7 +3065,7 @@ pub const HYPER_NATIVE_OP_CPU_INSPECTOR_PROFILE_STOP: u64 = 258;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x200000000` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=192; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3019,7 +3084,7 @@ pub const HYPER_NATIVE_OP_CPU_INSPECTOR_PROFILE_READ: u64 = 259;
 /// | Results | `generation: u64` |
 /// | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x80000000` |
 /// | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=trace_config; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3076,7 +3141,7 @@ pub const HYPER_NATIVE_OP_CPU_INSPECTOR_TRACE_CLEAR: u64 = 263;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x200000000` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=2656; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3095,7 +3160,7 @@ pub const HYPER_NATIVE_OP_CPU_INSPECTOR_TRACE_READ: u64 = 262;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x8` |
 /// | User memory | `observation: Write, len=observation_size bytes, max-bytes=4096, record=cpu_observation; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3171,7 +3236,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_CREATE: u64 = 256;
 /// | Results | `pending_virtual_machine: handle` |
 /// | Capability effects | `lease: ConsumeOnCommit, kind=virtual_machine_creation_lease, rights=0x20000000`, `pending_virtual_machine: produce, kind=pending_virtual_machine, fixed=0xc2a, inherited-from(lease), mask=0xf0000000000` |
 /// | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=virtual_machine_configuration; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3209,7 +3274,7 @@ pub const HYPER_NATIVE_OP_PENDING_VIRTUAL_MACHINE_SET_MEMORY: u64 = 256;
 /// | Results | — |
 /// | Capability effects | `pending_virtual_machine: Borrow, kind=pending_virtual_machine, rights=0x20` |
 /// | User memory | `bootstrap: Read, len=bootstrap_size bytes, max-bytes=4096, record=virtual_cpu_bootstrap; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3247,7 +3312,7 @@ pub const HYPER_NATIVE_OP_PENDING_VIRTUAL_MACHINE_SEAL: u64 = 258;
 /// | Results | `virtual_machine: handle`, `boot_virtual_cpu: handle` |
 /// | Capability effects | `pending_virtual_machine: ConsumeOnCommit, kind=pending_virtual_machine, rights=0x400`, `virtual_machine: produce, kind=virtual_machine, fixed=0x82e, inherited-from(pending_virtual_machine), mask=0xf0000000000`, `boot_virtual_cpu: produce, kind=virtual_cpu, fixed=0x1000000042e, inherited-from(pending_virtual_machine), mask=0xe0000000000` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3304,7 +3369,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_MACHINE_REQUEST_STOP: u64 = 256;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `virtual_machine: Borrow, kind=virtual_machine, rights=0x8` |
 /// | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_machine_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3323,7 +3388,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_MACHINE_GET_INFO: u64 = 257;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x8` |
 /// | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_cpu_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3342,7 +3407,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_CPU_GET_INFO: u64 = 256;
 /// | Results | `child: handle` |
 /// | Capability effects | `parent: Borrow, kind=resource_domain, rights=0x800000`, `child: produce, kind=resource_domain, fixed=0x984000b` |
 /// | User memory | `limits: Read, len=limits_size bytes, max-bytes=4096, record=resource_limits; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3475,7 +3540,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_SERIAL_REGISTER_OUTPUT: u64 = 256;
 /// | Results | `actual_bytes: byte_count` |
 /// | Capability effects | `virtual_serial: Borrow, kind=virtual_serial, rights=0x20` |
 /// | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3494,7 +3559,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_SERIAL_WRITE: u64 = 257;
 /// | Results | `thread: handle` |
 /// | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x200000`, `thread: produce, kind=thread, fixed=0x10000000c0f, inherited-from(receiver), mask=0xe0000000000` |
 /// | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=thread_create_request; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4121,7 +4186,7 @@ pub const HYPER_NATIVE_OP_CLOCK_GET_REALTIME: u64 = 258;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `lease: Borrow, kind=virtual_machine_creation_lease, rights=0x8` |
 /// | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_machine_platform_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4178,7 +4243,7 @@ pub const HYPER_NATIVE_OP_VMAR_MAP_PRIVATE: u64 = 261;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `virtual_machine: Borrow, kind=virtual_machine, rights=0x20` |
 /// | User memory | `request: Write, len=request_size bytes, max-bytes=4096, record=virtual_machine_power_request; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4254,7 +4319,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_MACHINE_REGISTER_MMIO: u64 = 261;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x20` |
 /// | User memory | `request: Write, len=request_size bytes, max-bytes=4096, record=virtual_cpu_mmio_request; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4349,7 +4414,7 @@ pub const HYPER_NATIVE_OP_DEVICE_CLAIM: u64 = 256;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=physical_device_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4368,7 +4433,7 @@ pub const HYPER_NATIVE_OP_PHYSICAL_DEVICE_INFO: u64 = 256;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x10000`, `vmo: Borrow, kind=vmo, rights=0x50` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=dma_extent; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4425,7 +4490,7 @@ pub const HYPER_NATIVE_OP_GUEST_MAILBOX_CREATE: u64 = 262;
 /// | Results | — |
 /// | Capability effects | `mailbox: Borrow, kind=guest_mailbox, rights=0x20` |
 /// | User memory | `bytes: Read, len=length bytes, max-bytes=256; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4444,7 +4509,7 @@ pub const HYPER_NATIVE_OP_GUEST_MAILBOX_SEND: u64 = 256;
 /// | Results | `bytes: byte_count` |
 /// | Capability effects | `mailbox: Borrow, kind=guest_mailbox, rights=0x10` |
 /// | User memory | `bytes: Write, len=capacity bytes, max-bytes=256; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4558,7 +4623,7 @@ pub const HYPER_NATIVE_OP_FILESYSTEM_MOUNT: u64 = 274;
 /// | Results | `mapping: handle`, `token: u64` |
 /// | Capability effects | `backend: Borrow, kind=virtual_machine, rights=0x20`, `memory: Borrow, kind=guest_memory, rights=0x40`, `mapping: produce, kind=guest_mapping, fixed=0x2a` |
 /// | User memory | — |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4596,7 +4661,7 @@ pub const HYPER_NATIVE_OP_GUEST_MAPPING_RELEASE: u64 = 256;
 /// | Results | `physical_device: handle` |
 /// | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8000`, `physical_device: produce, kind=physical_device, fixed=0x800f` |
 /// | User memory | `identity: Read, len=length bytes, max-bytes=512; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4615,7 +4680,7 @@ pub const HYPER_NATIVE_OP_DEVICE_CLAIM_MATCHING: u64 = 258;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_profile_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4634,7 +4699,7 @@ pub const HYPER_NATIVE_OP_DEVICE_PROFILE_INFO: u64 = 257;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_resource_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4653,7 +4718,7 @@ pub const HYPER_NATIVE_OP_DEVICE_RESOURCE_INFO: u64 = 258;
 /// | Results | `value: u64` |
 /// | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8` |
 /// | User memory | `query: Read, len=query_size bytes, max-bytes=4096, record=device_firmware_query; order=0`, `output: Write, len=capacity bytes, max-bytes=65536; order=1` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4672,7 +4737,7 @@ pub const HYPER_NATIVE_OP_DEVICE_FIRMWARE_READ: u64 = 259;
 /// | Results | `physical_device: handle` |
 /// | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8000`, `physical_device: produce, kind=physical_device, fixed=0x2803f` |
 /// | User memory | `entries: Read, len=count elements, max-elements=8, element-size=16, record=device_bundle_entry; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4748,7 +4813,7 @@ pub const HYPER_NATIVE_OP_DEVICE_IRQ_COMPLETE: u64 = 261;
 /// | Results | — |
 /// | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x20` |
 /// | User memory | `affinity_words: Read, len=word_count elements, max-elements=4, element-size=8; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4786,7 +4851,7 @@ pub const HYPER_NATIVE_OP_SYSTEM_CONFIG: u64 = 259;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x200000008` |
 /// | User memory | `record: Write, len=record_size bytes, max-bytes=4096, record=object_details; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5204,7 +5269,7 @@ pub const HYPER_NATIVE_OP_GUEST_INTERRUPT_SET_LEVEL: u64 = 256;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `inspector: Borrow, kind=memory_inspector, rights=0x8` |
 /// | User memory | `statistics: Write, len=statistics_size bytes, max-bytes=4096; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Object` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5394,7 +5459,7 @@ pub const HYPER_NATIVE_OP_CRASH_VIEW_HANDLE: u64 = 260;
 /// | Results | — |
 /// | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x20` |
 /// | User memory | `name: Read, len=name_size bytes, max-bytes=64; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5413,7 +5478,7 @@ pub const HYPER_NATIVE_OP_THREAD_SET_CURRENT_NAME: u64 = 265;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `device: Borrow, kind=physical_device, rights=0x8008` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_dma_fault_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5451,7 +5516,7 @@ pub const HYPER_NATIVE_OP_NATIVE_BLOCK_TRANSFER: u64 = 257;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x8` |
 /// | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5470,7 +5535,7 @@ pub const HYPER_NATIVE_OP_THREAD_GET_CURRENT_SCHEDULING: u64 = 266;
 /// | Results | — |
 /// | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x0` |
 /// | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5489,7 +5554,7 @@ pub const HYPER_NATIVE_OP_THREAD_SET_CURRENT_SCHEDULING: u64 = 267;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `receiver: Borrow, kind=thread, rights=0x8` |
 /// | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5508,7 +5573,7 @@ pub const HYPER_NATIVE_OP_THREAD_GET_SCHEDULING: u64 = 258;
 /// | Results | — |
 /// | Capability effects | `receiver: Borrow, kind=thread, rights=0x0` |
 /// | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5527,7 +5592,7 @@ pub const HYPER_NATIVE_OP_THREAD_SET_SCHEDULING: u64 = 259;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `receiver: Borrow, kind=virtual_cpu, rights=0x8` |
 /// | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5546,7 +5611,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_CPU_GET_SCHEDULING: u64 = 261;
 /// | Results | — |
 /// | Capability effects | `receiver: Borrow, kind=virtual_cpu, rights=0x0` |
 /// | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5565,7 +5630,7 @@ pub const HYPER_NATIVE_OP_VIRTUAL_CPU_SET_SCHEDULING: u64 = 262;
 /// | Results | — |
 /// | Capability effects | `receiver: Borrow, kind=process_builder, rights=0x0` |
 /// | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Task` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -5660,7 +5725,7 @@ pub const HYPER_NATIVE_OP_BLOCK_QUEUE_REAP: u64 = 258;
 /// | Results | `supported_size: byte_count` |
 /// | Capability effects | `receiver: Borrow, kind=block_queue, rights=0x8` |
 /// | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=block_queue_info; order=0` |
-/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 /// | Audit | `Capability` |
 ///
 /// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.

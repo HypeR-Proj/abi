@@ -475,6 +475,8 @@ pub enum MemoryDirection {
 }
 
 /// Whether a method may suspend its caller; this is not a timing guarantee.
+/// User-memory copies can populate file-backed pages or resolve private COW,
+/// so even an operation with nonblocking queue semantics may suspend there.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockingClass {
     Never,

@@ -161,6 +161,53 @@ File-open options; EXCLUSIVE requires CREATE.
 | `file_open_exclusive` | `2` |  |
 | `file_open_truncate` | `4` |  |
 
+### `file_time` (flags)
+
+Valid timestamp fields in file_metadata.valid_times; absent fields are zero.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `file_time_accessed` | `1` |  |
+| `file_time_modified` | `2` |  |
+| `file_time_created` | `4` |  |
+| `file_time_changed` | `8` |  |
+
+### `file_update` (flags)
+
+Selected fields in file_metadata_update.mask; unselected fields are zero.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `file_update_mode` | `1` |  |
+| `file_update_accessed` | `2` |  |
+| `file_update_modified` | `4` |  |
+
+### `file_sync` (enum)
+
+Durability scope passed to file_sync.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `file_sync_data` | `0` |  |
+| `file_sync_all` | `1` |  |
+
+### `file_lock` (enum)
+
+Advisory file lock mode; deadlines control waiting independently.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `file_lock_shared` | `0` |  |
+| `file_lock_exclusive` | `1` |  |
+
+### `metadata_lookup` (flags)
+
+Final-component lookup policy for directory metadata operations.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `metadata_lookup_nofollow` | `1` |  |
+
 ### `directory_open` (flags)
 
 Directory traversal options.
@@ -856,6 +903,7 @@ RISC-V ISA extensions accepted in guest configuration.
 
 ## Semantic rules
 
+- MayBlock includes memory reclaim, file page-in and private-copy resolution during user-buffer access. A nonblocking channel operation does not wait for queue availability, but accessing a valid demand-paged buffer can still suspend its caller. Never is not a latency bound or authorization for an IRQ-disabled dispatch path. All Native invocations currently enter a sleepable kernel context; only individually audited methods without user-memory access or other suspension paths may declare Never.
 - ABI revision is a major compatibility generation, not a build number: additive operations, supported flags and record tails do not require changing it. Revision zero remains explicitly unstable until release. The receiver and operation are separate from six u64 argument registers and two auxiliary result registers. At least one argument register remains reserved in current signatures. All unused registers and reserved input fields must be zero; unknown option bits are INVALID_ARGUMENT. New operations or selectors unsupported by an older kernel return NOT_SUPPORTED where specified; callers must not infer runtime feature availability solely from ABI revision.
 - Extensible input records carry an explicit byte size bounded by EXTENSIBLE_RECORD_MAX_BYTES. A supported historical prefix remains valid; omitted known trailing fields default to zero and unknown supplied trailing bytes must be zero. Validation and copying precede side effects. Output records report their supported size where specified and never write beyond the caller's accepted prefix. C veneers accept caller-supplied sizes rather than deriving the caller's allocation size inside a shared library. SDK convenience functions may choose default options; they do not define additional machine operations.
 - Task/ObjectInspector scans and DirectoryStream reads take an explicit record_size byte stride, aligned to eight bytes and bounded by EXTENSIBLE_RECORD_MAX_BYTES. It must cover the record's stable minimum prefix. Each returned element starts at index times record_size; known prefixes are clipped to that stride and unknown output tails are zeroed. Capacity remains the documented bounded page capacity, and only the returned count elements are initialized. Input arrays of capability dispositions, wait items and device bundle entries retain their declared fixed element layouts; incompatible element meanings require a new typed format, never a silent stride change.
@@ -1059,7 +1107,7 @@ Object-local method `handle_get_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `handle: Borrow, any, rights=0x0` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=handle_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1079,7 +1127,7 @@ Object-local method `object_get_basic_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `handle: Borrow, any, rights=0x8` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=object_basic_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1239,7 +1287,7 @@ Object-local method `byte_channel_write`.
 | Results | — |
 | Capability effects | `endpoint: Borrow, kind=byte_channel, rights=0x20` |
 | User memory | `bytes: Read, len=byte_count bytes, max-bytes=65536; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1259,7 +1307,7 @@ Object-local method `byte_channel_read`.
 | Results | `actual_bytes: byte_count; also-on=buffer_too_small` |
 | Capability effects | `endpoint: Borrow, kind=byte_channel, rights=0x10` |
 | User memory | `bytes: Write, len=byte_capacity bytes, max-bytes=65536; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1300,7 +1348,7 @@ Object-local method `console_read`.
 | Results | `actual_bytes: byte_count; also-on=would_block` |
 | Capability effects | `console: Borrow, kind=console, rights=0x10` |
 | User memory | `bytes: Write, len=byte_capacity bytes, max-bytes=4096; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1321,7 +1369,7 @@ Object-local method `console_write`.
 | Results | `actual_bytes: byte_count; also-on=would_block` |
 | Capability effects | `console: Borrow, kind=console, rights=0x20` |
 | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1402,7 +1450,7 @@ Object-local method `capability_channel_try_send`.
 | Results | — |
 | Capability effects | `endpoint: Borrow, kind=capability_channel, rights=0x20` |
 | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0`, `dispositions: Read, len=disposition_count elements, max-elements=16, element-size=24, record=capability_disposition, transactional-handles=(handle, rights, expected_kind, operation), common-rights=0x2, operations=[move=0:ConsumeOnCommit/rights=0x2+duplicate=1:Borrow/rights=0x3], commit=AtomicOnOk; order=1` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1465,7 +1513,7 @@ Object-local method `process_builder_set_name`.
 | Results | — |
 | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 | User memory | `name: Read, len=name_size bytes, max-bytes=64; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1485,7 +1533,7 @@ Object-local method `process_builder_set_data`.
 | Results | — |
 | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 | User memory | `data: Read, len=data_size bytes, max-bytes=16384; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1505,7 +1553,7 @@ Object-local method `process_builder_set_affinity`.
 | Results | — |
 | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 | User memory | `affinity_words: Read, len=word_count elements, max-elements=4, element-size=8; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1545,7 +1593,7 @@ Object-local method `process_builder_seal`.
 | Results | — |
 | Capability effects | `builder: Borrow, kind=process_builder, rights=0x20` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1585,7 +1633,7 @@ Object-local method `process_builder_abort`.
 | Results | — |
 | Capability effects | `builder: ConsumeOnCommit, kind=process_builder, rights=0x800` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1645,7 +1693,7 @@ Object-local method `process_get_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `process: Borrow, kind=process, rights=0x8` |
 | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=process_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1665,7 +1713,7 @@ Object-local method `task_inspector_scan_processes`.
 | Results | `count: element_count`, `next_cursor: u64` |
 | Capability effects | `inspector: Borrow, kind=task_inspector, rights=0x8` |
 | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=task_process; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1685,7 +1733,7 @@ Object-local method `task_inspector_scan_threads`.
 | Results | `count: element_count`, `next_cursor: u64` |
 | Capability effects | `inspector: Borrow, kind=task_inspector, rights=0x8` |
 | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=task_thread; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1725,7 +1773,7 @@ Object-local method `object_inspector_scan_objects`.
 | Results | `count: element_count`, `next_cursor: u64` |
 | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x8` |
 | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=object_inspection; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1745,7 +1793,7 @@ Object-local method `object_inspector_scan_handles`.
 | Results | `count: element_count`, `next_cursor: u64` |
 | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x8` |
 | User memory | `records: Write, len=capacity records, max-elements=8, stride=record_size bytes, max-stride=4096, record=handle_inspection; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1885,7 +1933,7 @@ Object-local method `vmo_create`.
 | Results | `vmo: handle` |
 | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x7b` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1905,7 +1953,7 @@ Object-local method `vmo_read`.
 | Results | — |
 | Capability effects | `vmo: Borrow, kind=vmo, rights=0x10` |
 | User memory | `bytes: Write, len=byte_count bytes, max-bytes=65536; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1925,7 +1973,7 @@ Object-local method `vmo_write`.
 | Results | — |
 | Capability effects | `vmo: Borrow, kind=vmo, rights=0x20` |
 | User memory | `bytes: Read, len=byte_count bytes, max-bytes=65536; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1945,7 +1993,7 @@ Object-local method `vmar_allocate`.
 | Results | `child: handle`, `address: u64` |
 | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `child: produce, kind=vmar, fixed=0x4b, inherited-from(vmar), mask=0x1000000000` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1965,7 +2013,7 @@ Object-local method `vmar_map`.
 | Results | — |
 | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `vmo: Borrow, kind=vmo, rights=0x40` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -1985,7 +2033,7 @@ Object-local method `vmar_protect`.
 | Results | — |
 | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2005,7 +2053,7 @@ Object-local method `vmar_unmap`.
 | Results | — |
 | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2025,7 +2073,7 @@ Object-local method `vmar_destroy`.
 | Results | — |
 | Capability effects | `vmar: ConsumeOnCommit, kind=vmar, rights=0x40` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2065,7 +2113,7 @@ Object-local method `memory_inspector_read`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `inspector: Borrow, kind=memory_inspector, rights=0x8` |
 | User memory | `observation: Write, len=observation_size bytes, max-bytes=4096, record=memory_observation; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2125,7 +2173,7 @@ Object-local method `cpu_inspector_profile_read`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x200000000` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=192; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2145,7 +2193,7 @@ Object-local method `cpu_inspector_trace_start`.
 | Results | `generation: u64` |
 | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x80000000` |
 | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=trace_config; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2205,7 +2253,7 @@ Object-local method `cpu_inspector_trace_read`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x200000000` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=2656; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2225,7 +2273,7 @@ Object-local method `cpu_inspector_read`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `inspector: Borrow, kind=cpu_inspector, rights=0x8` |
 | User memory | `observation: Write, len=observation_size bytes, max-bytes=4096, record=cpu_observation; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2305,7 +2353,7 @@ Object-local method `virtual_machine_create`.
 | Results | `pending_virtual_machine: handle` |
 | Capability effects | `lease: ConsumeOnCommit, kind=virtual_machine_creation_lease, rights=0x20000000`, `pending_virtual_machine: produce, kind=pending_virtual_machine, fixed=0xc2a, inherited-from(lease), mask=0xf0000000000` |
 | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=virtual_machine_configuration; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2345,7 +2393,7 @@ Object-local method `pending_virtual_machine_set_bootstrap`.
 | Results | — |
 | Capability effects | `pending_virtual_machine: Borrow, kind=pending_virtual_machine, rights=0x20` |
 | User memory | `bootstrap: Read, len=bootstrap_size bytes, max-bytes=4096, record=virtual_cpu_bootstrap; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2385,7 +2433,7 @@ Object-local method `pending_virtual_machine_install`.
 | Results | `virtual_machine: handle`, `boot_virtual_cpu: handle` |
 | Capability effects | `pending_virtual_machine: ConsumeOnCommit, kind=pending_virtual_machine, rights=0x400`, `virtual_machine: produce, kind=virtual_machine, fixed=0x82e, inherited-from(pending_virtual_machine), mask=0xf0000000000`, `boot_virtual_cpu: produce, kind=virtual_cpu, fixed=0x1000000042e, inherited-from(pending_virtual_machine), mask=0xe0000000000` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2445,7 +2493,7 @@ Object-local method `virtual_machine_get_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `virtual_machine: Borrow, kind=virtual_machine, rights=0x8` |
 | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_machine_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2465,7 +2513,7 @@ Object-local method `virtual_cpu_get_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x8` |
 | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_cpu_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2485,7 +2533,7 @@ Object-local method `resource_domain_create`.
 | Results | `child: handle` |
 | Capability effects | `parent: Borrow, kind=resource_domain, rights=0x800000`, `child: produce, kind=resource_domain, fixed=0x984000b` |
 | User memory | `limits: Read, len=limits_size bytes, max-bytes=4096, record=resource_limits; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2625,7 +2673,7 @@ Object-local method `virtual_serial_write`.
 | Results | `actual_bytes: byte_count` |
 | Capability effects | `virtual_serial: Borrow, kind=virtual_serial, rights=0x20` |
 | User memory | `bytes: Read, len=byte_count bytes, max-bytes=4096; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -2645,7 +2693,7 @@ Object-local method `thread_create`.
 | Results | `thread: handle` |
 | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x200000`, `thread: produce, kind=thread, fixed=0x10000000c0f, inherited-from(receiver), mask=0xe0000000000` |
 | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=thread_create_request; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3305,7 +3353,7 @@ Object-local method `virtual_machine_creation_lease_get_platform_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `lease: Borrow, kind=virtual_machine_creation_lease, rights=0x8` |
 | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_machine_platform_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3365,7 +3413,7 @@ Object-local method `virtual_machine_get_power_request`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `virtual_machine: Borrow, kind=virtual_machine, rights=0x20` |
 | User memory | `request: Write, len=request_size bytes, max-bytes=4096, record=virtual_machine_power_request; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3445,7 +3493,7 @@ Object-local method `virtual_cpu_get_mmio_request`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x20` |
 | User memory | `request: Write, len=request_size bytes, max-bytes=4096, record=virtual_cpu_mmio_request; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3545,7 +3593,7 @@ Object-local method `physical_device_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=physical_device_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3565,7 +3613,7 @@ Object-local method `vmo_get_dma_extent`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x10000`, `vmo: Borrow, kind=vmo, rights=0x50` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=dma_extent; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3625,7 +3673,7 @@ Object-local method `guest_mailbox_send`.
 | Results | — |
 | Capability effects | `mailbox: Borrow, kind=guest_mailbox, rights=0x20` |
 | User memory | `bytes: Read, len=length bytes, max-bytes=256; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3645,7 +3693,7 @@ Object-local method `guest_mailbox_receive`.
 | Results | `bytes: byte_count` |
 | Capability effects | `mailbox: Borrow, kind=guest_mailbox, rights=0x10` |
 | User memory | `bytes: Write, len=capacity bytes, max-bytes=256; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3765,7 +3813,7 @@ Object-local method `guest_mapping_create`.
 | Results | `mapping: handle`, `token: u64` |
 | Capability effects | `backend: Borrow, kind=virtual_machine, rights=0x20`, `memory: Borrow, kind=guest_memory, rights=0x40`, `mapping: produce, kind=guest_mapping, fixed=0x2a` |
 | User memory | — |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3805,7 +3853,7 @@ Object-local method `device_claim_matching`.
 | Results | `physical_device: handle` |
 | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8000`, `physical_device: produce, kind=physical_device, fixed=0x800f` |
 | User memory | `identity: Read, len=length bytes, max-bytes=512; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3825,7 +3873,7 @@ Object-local method `device_profile_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_profile_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3845,7 +3893,7 @@ Object-local method `device_resource_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `device: Borrow, kind=physical_device, rights=0x8` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_resource_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3865,7 +3913,7 @@ Object-local method `device_firmware_read`.
 | Results | `value: u64` |
 | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8` |
 | User memory | `query: Read, len=query_size bytes, max-bytes=4096, record=device_firmware_query; order=0`, `output: Write, len=capacity bytes, max-bytes=65536; order=1` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3885,7 +3933,7 @@ Object-local method `device_claim_bundle`.
 | Results | `physical_device: handle` |
 | Capability effects | `authority: Borrow, kind=device_assignment_authority, rights=0x8000`, `physical_device: produce, kind=physical_device, fixed=0x2803f` |
 | User memory | `entries: Read, len=count elements, max-elements=8, element-size=16, record=device_bundle_entry; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -3965,7 +4013,7 @@ Object-local method `virtual_cpu_set_affinity`.
 | Results | — |
 | Capability effects | `virtual_cpu: Borrow, kind=virtual_cpu, rights=0x20` |
 | User memory | `affinity_words: Read, len=word_count elements, max-elements=4, element-size=8; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4005,7 +4053,7 @@ Object-local method `object_inspector_read_details`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `inspector: Borrow, kind=object_inspector, rights=0x200000008` |
 | User memory | `record: Write, len=record_size bytes, max-bytes=4096, record=object_details; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4445,7 +4493,7 @@ Object-local method `memory_inspector_read_statistics`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `inspector: Borrow, kind=memory_inspector, rights=0x8` |
 | User memory | `statistics: Write, len=statistics_size bytes, max-bytes=4096; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4645,7 +4693,7 @@ Object-local method `thread_set_current_name`.
 | Results | — |
 | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x20` |
 | User memory | `name: Read, len=name_size bytes, max-bytes=64; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4665,7 +4713,7 @@ Object-local method `device_dma_fault_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `device: Borrow, kind=physical_device, rights=0x8008` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=device_dma_fault_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4705,7 +4753,7 @@ Object-local method `thread_get_current_scheduling`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x8` |
 | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4725,7 +4773,7 @@ Object-local method `thread_set_current_scheduling`.
 | Results | — |
 | Capability effects | `receiver: Borrow, kind=execution_context, rights=0x0` |
 | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4745,7 +4793,7 @@ Object-local method `thread_get_scheduling`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `receiver: Borrow, kind=thread, rights=0x8` |
 | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4765,7 +4813,7 @@ Object-local method `thread_set_scheduling`.
 | Results | — |
 | Capability effects | `receiver: Borrow, kind=thread, rights=0x0` |
 | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4785,7 +4833,7 @@ Object-local method `virtual_cpu_get_scheduling`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `receiver: Borrow, kind=virtual_cpu, rights=0x8` |
 | User memory | `configuration: Write, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4805,7 +4853,7 @@ Object-local method `virtual_cpu_set_scheduling`.
 | Results | — |
 | Capability effects | `receiver: Borrow, kind=virtual_cpu, rights=0x0` |
 | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4825,7 +4873,7 @@ Object-local method `process_builder_set_scheduling`.
 | Results | — |
 | Capability effects | `receiver: Borrow, kind=process_builder, rights=0x0` |
 | User memory | `configuration: Read, len=configuration_size bytes, max-bytes=4096, record=scheduling_parameters; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Task` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
@@ -4925,7 +4973,7 @@ Object-local method `block_queue_info`.
 | Results | `supported_size: byte_count` |
 | Capability effects | `receiver: Borrow, kind=block_queue, rights=0x8` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=4096, record=block_queue_info; order=0` |
-| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=None` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
