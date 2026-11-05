@@ -102,6 +102,7 @@ constant_groups! {
     enum file_sync {
         file_sync_data = 0,
         file_sync_all = 1,
+        file_sync_volume = 2,
     }
 
     /// Advisory file lock mode; deadlines control waiting independently.
