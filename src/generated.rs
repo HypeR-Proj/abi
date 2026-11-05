@@ -461,6 +461,11 @@ pub const HYPER_NATIVE_FILE_SYNC_DATA: u64 = 0;
 /// Durability scope passed to `file_sync`.
 /// Select one value; this is not a bit mask.
 pub const HYPER_NATIVE_FILE_SYNC_ALL: u64 = 1;
+/// `file_sync_volume` in the `file_sync` enum domain.
+///
+/// Durability scope passed to `file_sync`.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_FILE_SYNC_VOLUME: u64 = 2;
 
 /// `file_lock_shared` in the `file_lock` enum domain.
 ///

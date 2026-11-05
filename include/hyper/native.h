@@ -82,6 +82,8 @@
  *
  * - filesystem_mount_ramfs and filesystem_switch_root require MANAGE_NAMESPACE|WRITE|EXECUTE on the live namespace-root Directory anchor. Ordinary directory opens never confer MANAGE_NAMESPACE; only explicit capability duplication, delegation or root-anchor scope creation preserves it. Ramfs mount does not create or configure block filesystems. switch_root copies its request, at most 16 mount moves and every bounded UTF-8 path before namespace mutation; zero moves requires a null moves pointer. new_root and move sources resolve in the old namespace, while put_old and move targets resolve inside new_root. The root and all requested moves publish atomically. Existing non-anchor Directory and File capabilities retain their opened locations; existing root anchors follow the published root. A rejected transaction preserves all mount edges and the current root. Paths are at most 4096 bytes, nonempty and contain no NUL bytes. Layout, boot stages and the choice of put_old are userspace policy.
  *
+ * - file_sync requires File WRITE. FILE_SYNC_DATA persists the file contents and metadata required to recover them; FILE_SYNC_ALL includes its other metadata. FILE_SYNC_VOLUME drains accepted changes across the filesystem containing that file, including other files, then completes the backend volume fence. A backend may provide a stronger fence for a file scope. Concurrent writes may be included but writes accepted after the synchronization boundary are not promised. Ramfs completes in memory and makes no persistence claim. Unknown scopes are invalid; a failed fence must not be reported as successful.
+ *
  * - filesystem_unmount requires Directory WRITE|EXECUTE and an exact mounted-root path. The namespace root cannot be detached. Live File, Directory, cwd, path-resolution or nested-mount uses return busy. Admission closes before synchronous backend flush and namespace publication; no mount-table spinlock is held across backend IPC. A failed flush or concurrent topology change leaves the mount attached. Successful detach permanently retires its transport health and content identity, so retained snapshots or speculative cache work cannot revive the old mount. Userspace then stops and joins the worker before reusing the returned NativeBlock; the syscall itself does not terminate processes or release backend DMA mappings.
  *
  * - VM power control requires WRITE authority. virtual_machine_get_power_request returns a non-consuming snapshot of one pending request, or would_block when none exists. Request IDs identify one completion and stale IDs are rejected. Operations are CPU_ON (1), CPU_OFF (2), SYSTEM_OFF (3), and SYSTEM_RESET (4); accept is strictly 0 or 1. Reserved output is zero. POWER_REQUEST signals pending work, and VCPU_TERMINATED prompts inspection of per-vCPU terminal state. virtual_machine_open_vcpu returns a control handle for an already configured vCPU; it does not change the immutable topology. The runtime owns lifecycle policy; no guest request is forwarded to host firmware. Guest suspend operations remain unsupported.
@@ -1078,6 +1080,13 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Select one value; this is not a bit mask.
  */
 #define HYPER_NATIVE_FILE_SYNC_ALL UINT64_C(1)
+/**
+ * `file_sync_volume` in the `file_sync` enum domain.
+ *
+ * Durability scope passed to `file_sync`.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_FILE_SYNC_VOLUME UINT64_C(2)
 /** @} */
 
 /**
