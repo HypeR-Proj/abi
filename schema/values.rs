@@ -66,6 +66,11 @@ macro_rules! constant_groups {
 }
 
 constant_groups! {
+    /// Optional Native vDSO discovery in the application's ELF auxiliary vector.
+    constants vdso {
+        /// ELF base of the paired kernel vDSO. Zero or absence selects syscalls.
+        vdso_auxv_base = 33,
+    }
     /// VMO allocation options; zero uses ordinary noncontiguous backing.
     flags vmo_create {
         vmo_create_contiguous = 1 << 0,

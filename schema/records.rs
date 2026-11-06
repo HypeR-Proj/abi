@@ -2891,9 +2891,19 @@ pub const RECORDS: &[Record] = &[
                 kind: FieldKind::U64,
                 offset: 88,
             },
+            Field {
+                name: "vdso_image",
+                kind: FieldKind::U64,
+                offset: 96,
+            },
+            Field {
+                name: "vdso_data",
+                kind: FieldKind::U64,
+                offset: 104,
+            },
         ],
-        minimum_size: 96,
-        size: 96,
+        minimum_size: 112,
+        size: 112,
         alignment: 8,
     },
     Record {

@@ -386,6 +386,14 @@ pub const HYPER_NATIVE_SIGNAL_BLOCK_QUEUE_WRITABLE: u64 = 1_u64 << 1;
 /// Wait signal `peer_closed` for `block_queue` objects; bit positions are object-local.
 pub const HYPER_NATIVE_SIGNAL_BLOCK_QUEUE_PEER_CLOSED: u64 = 1_u64 << 2;
 
+/// `vdso_auxv_base` in the `vdso` constants domain.
+///
+/// Optional Native vDSO discovery in the application's ELF auxiliary vector.
+/// Numeric parameter or sentinel, not an enum discriminant.
+///
+/// ELF base of the paired kernel vDSO. Zero or absence selects syscalls.
+pub const HYPER_NATIVE_VDSO_AUXV_BASE: u64 = 33;
+
 /// `vmo_create_contiguous` in the `vmo_create` flags domain.
 ///
 /// VMO allocation options; zero uses ordinary noncontiguous backing.
@@ -4606,7 +4614,7 @@ pub const HYPER_NATIVE_OP_NATIVE_BLOCK_ACTIVATE: u64 = 256;
 /// | Operation | 274 |
 /// | Feature | `Core` |
 /// | Arguments | `channel: handle`, `buffer: handle`, `queue: handle`, `request: user_address`, `request_size: byte_count` |
-/// | Results | — |
+/// | Results | `mount_id: u64` |
 /// | Capability effects | `directory: Borrow, kind=directory, rights=0xa0`, `channel: Borrow, kind=byte_channel, rights=0x34`, `buffer: Borrow, kind=vmo, rights=0x70`, `queue: Borrow, kind=block_queue, rights=0x14` |
 /// | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=filesystem_mount_request; order=0` |
 /// | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=None` |
@@ -5795,6 +5803,44 @@ pub const HYPER_NATIVE_OP_BLOCK_QUEUE_CREATE_WINDOW: u64 = 261;
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 pub const HYPER_NATIVE_OP_BLOCK_QUEUE_SUBMIT_WINDOW: u64 = 262;
 
+/// Object-local method `filesystem_detach_failed`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=directory, rights=0x400000000` |
+/// | Operation | 280 |
+/// | Feature | `Core` |
+/// | Arguments | `mount_id: u64` |
+/// | Results | `discarded_dirty_bytes: byte_count` |
+/// | Capability effects | `receiver: Borrow, kind=directory, rights=0x400000000` |
+/// | User memory | — |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
+/// | Audit | `Object` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED: u64 = 280;
+
+/// Object-local method `native_block_retire_queue`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=native_block, rights=0x20` |
+/// | Operation | 280 |
+/// | Feature | `Core` |
+/// | Arguments | `queue: handle`, `deadline: u64` |
+/// | Results | — |
+/// | Capability effects | `receiver: Borrow, kind=native_block, rights=0x20`, `queue: Borrow, kind=block_queue, rights=0x4` |
+/// | User memory | — |
+/// | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=None` |
+/// | Audit | `Capability` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE: u64 = 280;
+
 /// A decoded object method; enum discriminants are not a machine ABI.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NativeOperation {
@@ -6200,6 +6246,10 @@ pub enum NativeOperation {
     BlockQueueCreateWindow,
     /// Decoded method; see [`HYPER_NATIVE_OP_BLOCK_QUEUE_SUBMIT_WINDOW`] for its contract.
     BlockQueueSubmitWindow,
+    /// Decoded method; see [`HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED`] for its contract.
+    FilesystemDetachFailed,
+    /// Decoded method; see [`HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE`] for its contract.
+    NativeBlockRetireQueue,
 }
 
 #[rustfmt::skip]
@@ -6456,6 +6506,8 @@ impl NativeOperation {
             (HYPER_NATIVE_OBJECT_BLOCK_QUEUE, HYPER_NATIVE_OP_BLOCK_QUEUE_WAIT_SPACE) => Some(Self::BlockQueueWaitSpace),
             (HYPER_NATIVE_OBJECT_BLOCK_QUEUE, HYPER_NATIVE_OP_BLOCK_QUEUE_CREATE_WINDOW) => Some(Self::BlockQueueCreateWindow),
             (HYPER_NATIVE_OBJECT_BLOCK_QUEUE, HYPER_NATIVE_OP_BLOCK_QUEUE_SUBMIT_WINDOW) => Some(Self::BlockQueueSubmitWindow),
+            (HYPER_NATIVE_OBJECT_DIRECTORY, HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED) => Some(Self::FilesystemDetachFailed),
+            (HYPER_NATIVE_OBJECT_NATIVE_BLOCK, HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE) => Some(Self::NativeBlockRetireQueue),
             _ => None,
         }
     }
@@ -6664,6 +6716,8 @@ impl NativeOperation {
             Self::BlockQueueWaitSpace => HYPER_NATIVE_OP_BLOCK_QUEUE_WAIT_SPACE,
             Self::BlockQueueCreateWindow => HYPER_NATIVE_OP_BLOCK_QUEUE_CREATE_WINDOW,
             Self::BlockQueueSubmitWindow => HYPER_NATIVE_OP_BLOCK_QUEUE_SUBMIT_WINDOW,
+            Self::FilesystemDetachFailed => HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED,
+            Self::NativeBlockRetireQueue => HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE,
         }
     }
 
@@ -6871,6 +6925,8 @@ impl NativeOperation {
             Self::BlockQueueWaitSpace => Some(HYPER_NATIVE_OBJECT_BLOCK_QUEUE),
             Self::BlockQueueCreateWindow => Some(HYPER_NATIVE_OBJECT_BLOCK_QUEUE),
             Self::BlockQueueSubmitWindow => Some(HYPER_NATIVE_OBJECT_BLOCK_QUEUE),
+            Self::FilesystemDetachFailed => Some(HYPER_NATIVE_OBJECT_DIRECTORY),
+            Self::NativeBlockRetireQueue => Some(HYPER_NATIVE_OBJECT_NATIVE_BLOCK),
         }
     }
 
@@ -7078,6 +7134,8 @@ impl NativeOperation {
             Self::BlockQueueWaitSpace => 2,
             Self::BlockQueueCreateWindow => 0,
             Self::BlockQueueSubmitWindow => 4,
+            Self::FilesystemDetachFailed => 1,
+            Self::NativeBlockRetireQueue => 2,
         }
     }
 
@@ -7285,6 +7343,8 @@ impl NativeOperation {
             Self::BlockQueueWaitSpace => 4,
             Self::BlockQueueCreateWindow => 16,
             Self::BlockQueueSubmitWindow => 32,
+            Self::FilesystemDetachFailed => 17179869184,
+            Self::NativeBlockRetireQueue => 32,
         }
     }
 
@@ -9016,10 +9076,10 @@ const _: () = assert!(core::mem::offset_of!(HyperNativeCapabilityReceiveSlot, ex
 const _: () = assert!(core::mem::offset_of!(HyperNativeCapabilityReceiveSlot, flags) == 20);
 
 /// Minimum supported prefix of `loader_startup`, in bytes; individual calls define their buffer lengths.
-pub const HYPER_NATIVE_LOADER_STARTUP_MIN_SIZE: usize = 96;
+pub const HYPER_NATIVE_LOADER_STARTUP_MIN_SIZE: usize = 112;
 /// Wire layout for `loader_startup`.
 ///
-/// Size: 96 bytes; alignment: 8 bytes; supported minimum prefix: 96 bytes.
+/// Size: 112 bytes; alignment: 8 bytes; supported minimum prefix: 112 bytes.
 /// Scalar widths and member offsets are fixed across supported architectures.
 /// The minimum prefix describes extensibility, not permission to truncate every call's buffer;
 /// the consuming operation defines its accepted length.
@@ -9054,8 +9114,12 @@ pub struct HyperNativeLoaderStartup {
     pub object_factory: u64,
     /// Wire offset 88 bytes; width 8 bytes.
     pub system_info: u64,
+    /// Wire offset 96 bytes; width 8 bytes.
+    pub vdso_image: u64,
+    /// Wire offset 104 bytes; width 8 bytes.
+    pub vdso_data: u64,
 }
-const _: () = assert!(core::mem::size_of::<HyperNativeLoaderStartup>() == 96);
+const _: () = assert!(core::mem::size_of::<HyperNativeLoaderStartup>() == 112);
 const _: () = assert!(core::mem::align_of::<HyperNativeLoaderStartup>() == 8);
 const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, size) == 0);
 const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, handle_count) == 4);
@@ -9071,6 +9135,8 @@ const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, loader_siz
 const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, execution_context) == 72);
 const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, object_factory) == 80);
 const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, system_info) == 88);
+const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, vdso_image) == 96);
+const _: () = assert!(core::mem::offset_of!(HyperNativeLoaderStartup, vdso_data) == 104);
 
 /// Minimum supported prefix of `startup_handle`, in bytes; individual calls define their buffer lengths.
 pub const HYPER_NATIVE_STARTUP_HANDLE_MIN_SIZE: usize = 16;

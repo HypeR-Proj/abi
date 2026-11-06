@@ -158,7 +158,15 @@ fn generated_rust_layouts_are_compiler_checked() {
     assert_eq!(generated::HYPER_NATIVE_ELF_ABI_VERSION, 0);
     assert_eq!(
         core::mem::size_of::<generated::HyperNativeLoaderStartup>(),
+        112
+    );
+    assert_eq!(
+        core::mem::offset_of!(generated::HyperNativeLoaderStartup, vdso_image),
         96
+    );
+    assert_eq!(
+        core::mem::offset_of!(generated::HyperNativeLoaderStartup, vdso_data),
+        104
     );
     assert_eq!(
         generated::HYPER_NATIVE_PROCESS_STARTUP_DATA_MAX_BYTES,
