@@ -16,6 +16,10 @@
 /**
  * @page hyper_native_contract Native ABI semantic contract
  *
+ * - loader_startup optionally supplies vdso_image and vdso_data VMO handles as a pair; both zero means unavailable. The loader maps the matching ELF image read/execute and its observation segment read-only/non-executable, closes these handles after mapping, and supplies the image base as auxv VDSO_AUXV_BASE (33). The image describes its code/data placement through PT_LOAD segments; applications must not depend on private data offsets. Live observation backing refuses writable/executable mappings, writes, snapshots and private COW views. Mapping lifetime is independent of SystemInfo and the startup VMO handles: closing them does not revoke public clock or capture-activity observations.
+ *
+ * - The optional vDSO exports versioned ELF symbols __hyper_vdso_monotonic_v1, __hyper_vdso_realtime_v1 and __hyper_vdso_ipc_active_v1. Each is a no-argument C function returning a struct of three consecutive 64-bit members: signed status, unsigned value0, unsigned value1. Successful clock results match the corresponding clock_get operation; IPC activity returns value0 zero or one and value1 zero. A missing image/symbol or NOT_SUPPORTED clock result selects the existing invocation path. IPC activity is an advisory hint only: missing support conservatively retains annotation invocations. It grants no capture authority or generation correlation. A supported inactive hint suppresses new BEGIN annotations; existing END generation checks remain authoritative. Capture-boundary races are best effort. The vDSO exposes no cold system configuration or capability-scoped observations.
+ *
  * - MayBlock includes memory reclaim, file page-in and private-copy resolution during user-buffer access. A nonblocking channel operation does not wait for queue availability, but accessing a valid demand-paged buffer can still suspend its caller. Never is not a latency bound or authorization for an IRQ-disabled dispatch path. All Native invocations currently enter a sleepable kernel context; only individually audited methods without user-memory access or other suspension paths may declare Never.
  *
  * - ABI revision is a major compatibility generation, not a build number: additive operations, supported flags and record tails do not require changing it. Revision zero remains explicitly unstable until release. The receiver and operation are separate from six u64 argument registers and two auxiliary result registers. At least one argument register remains reserved in current signatures. All unused registers and reserved input fields must be zero; unknown option bits are INVALID_ARGUMENT. New operations or selectors unsupported by an older kernel return NOT_SUPPORTED where specified; callers must not infer runtime feature availability solely from ABI revision.
@@ -76,7 +80,7 @@
  *
  * - Guest mapping creation borrows backend VirtualMachine WRITE and GuestMemory MAP, populates the full stable grant, and returns an owned mapping handle plus a backend-VM-local non-reused token. The backend IPA envelope must contain all sparse aliases: alias = 64 GiB + host physical address, with host addresses below 256 GiB. Unadmitted envelope holes have no RAM or page bitmap entries. The kernel constructs immutable frontend-ordered, coalesced physical extents; neither Native policy nor Linux may replace their addresses. Backend notification write64 0x28 admits one token exactly once to that unique notification route; read64 0x30/0x38/0x40/0x48 return frontend base, total bytes, status, extent count. Write64 0x50 selects an extent index; read64 0x58/0x60/0x68/0x70 return alias, frontend-relative offset, byte length, and query status. Rejection clears the old reply. Extents cover the entire frontend range without holes or overlapping physical pages. After draining vhost and releasing all page pins, only that backend route may write64 the token at 0x20 to certify quiescence. Mapping release accepts never-admitted or quiescent tokens, withdraws lookup, clears leaves, waits for every CPU translation acknowledgement and, for an IOMMU-bound backend, completed DMA invalidation, then releases backing. Closing a mapping handle alone quarantines its pages until backend VM retirement. Notification control operation 3 permanently disconnects both routes, only when no admitted mapping remains; a disconnected route never affects an address or IRQ reused by a subsequent connection.
  *
- * - Native block creation dedicates one fully resident 1048576-byte guest-memory grant permanently to one kernel virtio-scsi initiator; repeated creation from that grant fails. The backend VM must retain the matching mapping until execution and physical DMA are quiescent. Six standard split queues (control, event, and four request queues) have size 8, descriptor offsets n*4096, available offsets n*4096+256, and used offsets n*4096+512, relative to guest_base. Userspace negotiates VERSION_1 with the backend before activation. Activation enables notifications and issues READ CAPACITY(16), accepting only 512-byte sectors; capacity is never supplied by userspace. The activated block object survives filesystem worker handoff; a clean unmount returns that object rather than activating a replacement. Synchronous native_block_transfer calls use a persistent internal logical queue on the same device engine as explicit BlockQueue submissions, including their overlap ordering and flush fences. The transport has four independent command heads and a shared 512 KiB data pool. A command can use up to four contiguous 128 KiB data spans, so larger merged commands trade command concurrency for transfer size. Requests use shared queues and kernel completion notifications, not per-request userspace RPC. Unretired request failures permanently disconnect the initiator and never recycle its buffer. PEER_CLOSED reports disconnection. The physical pages remain retained by backend mappings until VM/DMA retirement; notification closure alone never proves DMA quiescence.
+ * - Native block creation dedicates one fully resident 1048576-byte guest-memory grant permanently to one kernel virtio-scsi initiator; repeated creation from that grant fails. The backend VM must retain the matching mapping until execution and physical DMA are quiescent. Six standard split queues (control, event, and four request queues) have size 8, descriptor offsets n*4096, available offsets n*4096+256, and used offsets n*4096+512, relative to guest_base. Userspace negotiates VERSION_1 with the backend before activation. Activation enables notifications and issues READ CAPACITY(16), accepting only 512-byte sectors; capacity is never supplied by userspace. The activated block object survives filesystem worker handoff. A volume manager may retain it and delegate per-generation BlockQueue objects; clean unmount does not require activating a replacement. Synchronous native_block_transfer calls use a persistent internal logical queue on the same device engine as explicit BlockQueue submissions, including their overlap ordering and flush fences. The transport has four independent command heads and a shared 512 KiB data pool. A command can use up to four contiguous 128 KiB data spans, so larger merged commands trade command concurrency for transfer size. Requests use shared queues and kernel completion notifications, not per-request userspace RPC. Unretired request failures permanently disconnect the initiator and never recycle its buffer. PEER_CLOSED reports disconnection. The physical pages remain retained by backend mappings until VM/DMA retirement; notification closure alone never proves DMA quiescence.
  *
  * - filesystem_mount borrows a READ|WRITE|WAIT ByteChannel, a READ|WRITE|MAP shared VMO, an optional READ|WAIT BlockQueue bound to the exact volume (also WRITE for writable mounts), and a WRITE|EXECUTE Directory. A zero queue handle selects buffered requests for a provider without block storage; a nonzero queue binds immutable write windows and direct read plans. The kernel retains the transport and buffer, validates the worker root, and publishes a fresh mount and filesystem identity at the capability-relative path. The VMO must satisfy the published filesystem protocol capacity and pinning contract. flags accept only FILESYSTEM_MOUNT_READ_ONLY; read-only mounts reject mutating protocol operations in the kernel independently of worker policy. Media discovery, format selection and exclusive NativeBlock ownership belong to the userspace filesystem manager and format worker, not this syscall.
  *
@@ -84,7 +88,7 @@
  *
  * - file_sync requires File WRITE. FILE_SYNC_DATA persists the file contents and metadata required to recover them; FILE_SYNC_ALL includes its other metadata. FILE_SYNC_VOLUME drains accepted changes across the filesystem containing that file, including other files, then completes the backend volume fence. A backend may provide a stronger fence for a file scope. Concurrent writes may be included but writes accepted after the synchronization boundary are not promised. Ramfs completes in memory and makes no persistence claim. Unknown scopes are invalid; a failed fence must not be reported as successful.
  *
- * - filesystem_unmount requires Directory WRITE|EXECUTE and an exact mounted-root path. The namespace root cannot be detached. Live File, Directory, cwd, path-resolution or nested-mount uses return busy. Admission closes before synchronous backend flush and namespace publication; no mount-table spinlock is held across backend IPC. A failed flush or concurrent topology change leaves the mount attached. Successful detach permanently retires its transport health and content identity, so retained snapshots or speculative cache work cannot revive the old mount. Userspace then stops and joins the worker before reusing the returned NativeBlock; the syscall itself does not terminate processes or release backend DMA mappings.
+ * - filesystem_unmount requires Directory WRITE|EXECUTE and an exact mounted-root path. The namespace root cannot be detached. Live File, Directory, cwd, path-resolution or nested-mount uses return busy. Admission closes before synchronous backend flush and namespace publication; no mount-table spinlock is held across backend IPC. A failed flush or concurrent topology change leaves the mount attached. Successful detach permanently retires its transport health and content identity, so retained snapshots or speculative cache work cannot revive the old mount. Userspace then stops and joins the worker and retires its block queue before reusing the volume; the syscall itself does not terminate processes or release backend DMA mappings.
  *
  * - VM power control requires WRITE authority. virtual_machine_get_power_request returns a non-consuming snapshot of one pending request, or would_block when none exists. Request IDs identify one completion and stale IDs are rejected. Operations are CPU_ON (1), CPU_OFF (2), SYSTEM_OFF (3), and SYSTEM_RESET (4); accept is strictly 0 or 1. Reserved output is zero. POWER_REQUEST signals pending work, and VCPU_TERMINATED prompts inspection of per-vCPU terminal state. virtual_machine_open_vcpu returns a control handle for an already configured vCPU; it does not change the immutable topology. The runtime owns lifecycle policy; no guest request is forwarded to host firmware. Guest suspend operations remain unsupported.
  *
@@ -227,6 +231,12 @@
  * - block_queue_create_window returns a fixed-size read-only VMO for the queue's Native staging window. Its handle permits READ|MAP|DUPLICATE|TRANSFER|INSPECT, never WRITE or EXECUTE. The kernel owns filling and lifetime; this is distinct from the exchange grant mapped into the I/O VM. Repeated calls identify the same queue-owned backing. A mapping exposes no general permission to submit its contents.
  *
  * - block_queue_submit_window accepts at most sixteen little-endian triples (first_sector, window_offset, byte_length). The nonzero operation token must identify an active filesystem write on this exact queue; stale tokens, invalid ranges and another queue's token fail. The queue retains immutable request ownership until all accepted batches finish. Ordinary applications retain the normal copying write ABI and never obtain these tokens. Metadata and unaligned sector updates may still use copied submissions. Window registration and queue binding survive filesystem worker handoff without reassigning authority to another device.
+ *
+ * - filesystem_mount returns the exact nonzero mount identity at namespace publication. The caller need not perform a later provider-dependent path lookup to identify a mount that failed immediately after publication.
+ *
+ * - filesystem_detach_failed requires MANAGE_NAMESPACE on the namespace root Directory and an exact nonzero mount identity. It only detaches an already permanently disconnected remote provider; a live provider, namespace root or mount with nested mounts is refused. Existing references may outlive namespace removal but cannot revive the failed provider. The operation discards unsynchronized VFS pages and returns their byte count; additional filesystem metadata or checkpoint loss is unknown. This explicitly lossy operation does not flush, stop workers, quiesce device I/O or authorize volume reuse. Ordinary filesystem_unmount retains its synchronous durability contract.
+ *
+ * - native_block_retire_queue requires NativeBlock WRITE and WAIT on a queue derived from the same device. It permanently closes queue admission and waits until every retained request, including physical in-flight transfers, has retired. On a healthy device success permits reuse through a fresh queue. A failed device returns PEER_CLOSED and never certifies safe reuse, even if logical completions are empty. Timeout or cancellation leaves admission closed; the caller may retry retirement. Public queue CLOSED alone does not prove device quiescence. Other queues on the same device are unaffected; the volume owner must account for every delegated queue.
  */
 #ifndef HYPER_NATIVE_H
 #define HYPER_NATIVE_H
@@ -937,6 +947,23 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Wait signal `peer_closed` for `block_queue` objects; bit positions are object-local.
  */
 #define HYPER_NATIVE_SIGNAL_BLOCK_QUEUE_PEER_CLOSED (UINT64_C(1) << 2)
+
+/**
+ * @defgroup hyper_native_vdso vdso (constants)
+ * @ingroup hyper_native
+ * Optional Native vDSO discovery in the application's ELF auxiliary vector.
+ * @{
+ */
+/**
+ * `vdso_auxv_base` in the `vdso` constants domain.
+ *
+ * Optional Native vDSO discovery in the application's ELF auxiliary vector.
+ * Numeric parameter or sentinel, not an enum discriminant.
+ *
+ * ELF base of the paired kernel vDSO. Zero or absence selects syscalls.
+ */
+#define HYPER_NATIVE_VDSO_AUXV_BASE UINT64_C(33)
+/** @} */
 
 /**
  * @defgroup hyper_native_vmo_create vmo_create (flags)
@@ -6493,7 +6520,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Operation | 274 |
  * | Feature | `Core` |
  * | Arguments | `channel: handle`, `buffer: handle`, `queue: handle`, `request: user_address`, `request_size: byte_count` |
- * | Results | — |
+ * | Results | `mount_id: u64` |
  * | Capability effects | `directory: Borrow, kind=directory, rights=0xa0`, `channel: Borrow, kind=byte_channel, rights=0x34`, `buffer: Borrow, kind=vmo, rights=0x70`, `queue: Borrow, kind=block_queue, rights=0x14` |
  * | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=filesystem_mount_request; order=0` |
  * | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=None` |
@@ -7806,6 +7833,48 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
  */
 #define HYPER_NATIVE_OP_BLOCK_QUEUE_SUBMIT_WINDOW UINT64_C(262)
+
+/**
+ * Object-local method `filesystem_detach_failed`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=directory, rights=0x400000000` |
+ * | Operation | 280 |
+ * | Feature | `Core` |
+ * | Arguments | `mount_id: u64` |
+ * | Results | `discarded_dirty_bytes: byte_count` |
+ * | Capability effects | `receiver: Borrow, kind=directory, rights=0x400000000` |
+ * | User memory | — |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
+ * | Audit | `Object` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED UINT64_C(280)
+
+/**
+ * Object-local method `native_block_retire_queue`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=native_block, rights=0x20` |
+ * | Operation | 280 |
+ * | Feature | `Core` |
+ * | Arguments | `queue: handle`, `deadline: u64` |
+ * | Results | — |
+ * | Capability effects | `receiver: Borrow, kind=native_block, rights=0x20`, `queue: Borrow, kind=block_queue, rights=0x4` |
+ * | User memory | — |
+ * | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=None` |
+ * | Audit | `Capability` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE UINT64_C(280)
 
 /**
  * Return the auxiliary-result registers defined on a failure status.
@@ -10200,11 +10269,11 @@ HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_capability_receive_slot_t, flags) 
 /**
  * Minimum supported prefix of `loader_startup`, in bytes; individual calls define their buffer lengths.
  */
-#define HYPER_NATIVE_LOADER_STARTUP_MIN_SIZE UINT64_C(96)
+#define HYPER_NATIVE_LOADER_STARTUP_MIN_SIZE UINT64_C(112)
 /**
  * Wire layout for `loader_startup`.
  *
- * Size: 96 bytes; alignment: 8 bytes; supported minimum prefix: 96 bytes.
+ * Size: 112 bytes; alignment: 8 bytes; supported minimum prefix: 112 bytes.
  * Scalar widths and member offsets are fixed across supported architectures.
  * The minimum prefix describes extensibility, not permission to truncate every call's buffer;
  * the consuming operation defines its accepted length.
@@ -10266,8 +10335,16 @@ typedef struct hyper_native_loader_startup_t {
      * Wire offset 88 bytes; width 8 bytes.
      */
     uint64_t system_info;
+    /**
+     * Wire offset 96 bytes; width 8 bytes.
+     */
+    uint64_t vdso_image;
+    /**
+     * Wire offset 104 bytes; width 8 bytes.
+     */
+    uint64_t vdso_data;
 } hyper_native_loader_startup_t;
-HYPER_ABI_STATIC_ASSERT(sizeof(hyper_native_loader_startup_t) == 96, "loader_startup size");
+HYPER_ABI_STATIC_ASSERT(sizeof(hyper_native_loader_startup_t) == 112, "loader_startup size");
 HYPER_ABI_STATIC_ASSERT(HYPER_ABI_ALIGNOF(hyper_native_loader_startup_t) == 8, "loader_startup alignment");
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, size) == 0, "loader_startup.size offset");
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, handle_count) == 4, "loader_startup.handle_count offset");
@@ -10283,6 +10360,8 @@ HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, loader_size) == 
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, execution_context) == 72, "loader_startup.execution_context offset");
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, object_factory) == 80, "loader_startup.object_factory offset");
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, system_info) == 88, "loader_startup.system_info offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, vdso_image) == 96, "loader_startup.vdso_image offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_loader_startup_t, vdso_data) == 104, "loader_startup.vdso_data offset");
 
 /**
  * Minimum supported prefix of `startup_handle`, in bytes; individual calls define their buffer lengths.
