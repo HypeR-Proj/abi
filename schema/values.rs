@@ -518,7 +518,7 @@ constant_groups! {
         native_block_batch_max = 4,
         native_block_batch_record_bytes = 16,
         native_block_transfer_frame_bytes = 524352,
-        native_block_memory_bytes = 1048576,
+        native_block_memory_bytes = 2097152,
         native_block_queue_count = 6,
         native_block_queue_size = 8,
         native_block_queue_stride = 4096,

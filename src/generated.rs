@@ -1524,7 +1524,7 @@ pub const HYPER_NATIVE_NATIVE_BLOCK_TRANSFER_FRAME_BYTES: u64 = 524352;
 ///
 /// Shared-memory geometry and transfer bounds for the Native block initiator.
 /// Numeric parameter or sentinel, not an enum discriminant.
-pub const HYPER_NATIVE_NATIVE_BLOCK_MEMORY_BYTES: u64 = 1048576;
+pub const HYPER_NATIVE_NATIVE_BLOCK_MEMORY_BYTES: u64 = 2097152;
 /// `native_block_queue_count` in the `native_block_layout` constants domain.
 ///
 /// Shared-memory geometry and transfer bounds for the Native block initiator.
