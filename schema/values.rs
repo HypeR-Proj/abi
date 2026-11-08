@@ -17,6 +17,8 @@ use super::model::{AbiConstant, ConstantGroup, ConstantGroupKind};
 
 /// Maximum borrowed wait records in one wait-many operation.
 pub(super) const OBJECT_WAIT_MANY_MAX_ITEMS: u32 = 64;
+/// Maximum notifications consumed by one batch wait.
+pub(super) const WAIT_SET_BATCH_MAX_EVENTS: u32 = 64;
 
 // Shared bounds keep signatures and public scalar exports in agreement.
 // Sizes are bytes unless the identifier explicitly counts records/items.
@@ -158,6 +160,8 @@ constant_groups! {
         /// Wait without a deadline; finite deadlines use absolute monotonic nanoseconds.
         deadline_infinite = u64::MAX,
         object_wait_many_max_items = OBJECT_WAIT_MANY_MAX_ITEMS as u64,
+        /// Maximum events returned by one `WaitSet` batch, independently of set capacity.
+        wait_set_batch_max_events = WAIT_SET_BATCH_MAX_EVENTS as u64,
     }
 
     /// Selectors for system configuration queries.

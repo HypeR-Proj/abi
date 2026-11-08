@@ -50,6 +50,20 @@ fn object_local_operations_decode_and_mask_failures_by_receiver_kind() {
             .failure_result_mask(generated::HYPER_NATIVE_STATUS_TRANSACTION_REJECTED),
         0
     );
+    assert_eq!(
+        NativeOperation::from_raw(
+            generated::HYPER_NATIVE_OBJECT_WAIT_SET,
+            generated::HYPER_NATIVE_OP_WAIT_SET_WAIT_BATCH
+        ),
+        Some(NativeOperation::WaitSetWaitBatch)
+    );
+    assert_eq!(NativeOperation::WaitSetWait.argument_count(), 3);
+    assert_eq!(NativeOperation::WaitSetWaitBatch.argument_count(), 5);
+    assert_eq!(
+        NativeOperation::WaitSetWaitBatch.receiver_rights(),
+        generated::HYPER_NATIVE_RIGHT_WAIT
+    );
+    assert_eq!(generated::HYPER_NATIVE_WAIT_SET_BATCH_MAX_EVENTS, 64);
     assert_eq!(NativeOperation::ThreadCreate.argument_count(), 2);
     assert_eq!(NativeOperation::FileReadAt.argument_count(), 4);
     assert_eq!(
