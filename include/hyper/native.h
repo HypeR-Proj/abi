@@ -102,6 +102,8 @@
  *
  * - WaitSets are process-local, non-transferable objects with capacity 1..1024. BIND_WAIT authorizes add/rearm/remove, WAIT authorizes consumption. Add requires source WAIT and reserves one event slot; WaitSet and CapabilityChannel sources are unsupported. Registration IDs are globally non-reused. Bind/rearm observe signal levels and sequence under the source lock; one-shot publication does not allocate. Rearm is busy until successful event consumption. Wait returns one exact 24-byte record (registration ID, signal bits, sequence), using an absolute monotonic deadline. Copyout failure restores the event unless removal or closure cancelled it. Source handle close does not cancel object-lifetime subscriptions; final set handle close detaches registrations and wakes consumers. Future CapabilityChannel subscriptions require ownership-epoch invalidation.
  *
+ * - wait_set_wait_batch requires WAIT and takes deadline, output, capacity, record_size and options, with the sixth register reserved zero. Capacity is 1..64; record_size is eight-byte aligned, 24..4096 bytes. Options are currently zero. Invalid geometry/options are rejected before consuming events. It waits only until the first notification is available, using the absolute monotonic deadline, then consumes immediately available notifications up to capacity without waiting to fill the batch. Success returns count in value0 (1..capacity) and zero in value1. Each copied record has the wait_set_event prefix and a zeroed unknown tail. Only the returned prefix is valid; the next record may have been partially touched by a failed copy and must be ignored. Each complete record independently commits consumption. A later copy failure, cancellation or set closure returns an already committed prefix successfully; before any progress it reports the corresponding failure. Failed/uncommitted deliveries are restored unless removal or closure cancelled them. Batches are not atomic queue snapshots; other consumers and concurrent rearm may interleave. Rearm remains busy until that registration's delivery commits, and explicit removal may race an already selected notification. The original wait_set_wait operation retains its single-record contract.
+ *
  * - ByteChannel duplicate authority permits shared endpoint ownership; peer_closed is published only when the last active endpoint handle closes. Internal operation pins, including WaitSet subscriptions, do not retain active endpoint authority.
  *
  * - process_get_current_id returns the calling Process KOID for observation only. It creates no handle or operational authority and is not a PID-to-handle lookup.
@@ -1301,6 +1303,15 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Numeric parameter or sentinel, not an enum discriminant.
  */
 #define HYPER_NATIVE_OBJECT_WAIT_MANY_MAX_ITEMS UINT64_C(64)
+/**
+ * `wait_set_batch_max_events` in the `core_limits` constants domain.
+ *
+ * Page geometry, record bounds, identity encoding and wait limits.
+ * Numeric parameter or sentinel, not an enum discriminant.
+ *
+ * Maximum events returned by one `WaitSet` batch, independently of set capacity.
+ */
+#define HYPER_NATIVE_WAIT_SET_BATCH_MAX_EVENTS UINT64_C(64)
 /** @} */
 
 /**
@@ -5672,6 +5683,27 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
 #define HYPER_NATIVE_OP_WAIT_SET_WAIT UINT64_C(259)
 
 /**
+ * Object-local method `wait_set_wait_batch`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `wait_set: Borrow, kind=wait_set, rights=0x4` |
+ * | Operation | 260 |
+ * | Feature | `Core` |
+ * | Arguments | `deadline: u64`, `output: user_address`, `capacity: element_count`, `record_size: byte_count`, `options: u64` |
+ * | Results | `count: element_count` |
+ * | Capability effects | `wait_set: Borrow, kind=wait_set, rights=0x4` |
+ * | User memory | `output: Write, len=capacity records, max-elements=64, stride=record_size bytes, max-stride=4096, record=wait_set_event; order=0` |
+ * | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Capability` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_WAIT_SET_WAIT_BATCH UINT64_C(260)
+
+/**
  * Object-local method `process_get_current_id`.
  *
  * | Property | Contract |
@@ -10025,7 +10057,7 @@ HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_file_metadata_update_t, modified_r
  * The minimum prefix describes extensibility, not permission to truncate every call's buffer;
  * the consuming operation defines its accepted length.
  *
- * Used by: `wait_set_wait`.
+ * Used by: `wait_set_wait`, `wait_set_wait_batch`.
  */
 typedef struct hyper_native_wait_set_event_t {
     /**

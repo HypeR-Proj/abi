@@ -258,6 +258,7 @@ Page geometry, record bounds, identity encoding and wait limits.
 | `koid_slot_mask` | `4294967295` | Low slot bits of a KOID; the generation is required for identity. |
 | `deadline_infinite` | `18446744073709551615` | Wait without a deadline; finite deadlines use absolute monotonic nanoseconds. |
 | `object_wait_many_max_items` | `64` |  |
+| `wait_set_batch_max_events` | `64` | Maximum events returned by one `WaitSet` batch, independently of set capacity. |
 
 ### `system_config` (enum)
 
@@ -955,6 +956,7 @@ RISC-V ISA extensions accepted in guest configuration.
 - Immutable VMO snapshots grant READ and MAP but never WRITE. vmo_create_snapshot coherently copies its source and reports Busy while writable mappings or hardware writers exist. Private mappings require source READ|MAP and VMAR MAP: source_offset is page aligned, data_offset is less than one page, source_length bytes starting at source_offset+data_offset initialize destination data_offset; all other destination bytes are zero. Writable private views never permit EXECUTE. Executable private views additionally require an executable source VMO and source EXECUTE rights; sanitized pages are sealed and instruction-published before mapping, with no writable alias. Copy-on-write mode shares immutable full pages until first write; eager mode allocates all private pages before publication. Private writes, including kernel copyout and atomic waits, cannot change the source or another private view. Ordinary writable/shared VMOs and exclusive hardware leases keep their stable backing contract. Snapshot bytes and old page versions remain owned through acknowledged translation retirement.
 - VM platform inspection borrows an INSPECT creation lease without consuming it. Metadata describes the selected local platform: counter_frequency_hz is the actual guest counter frequency, and riscv_isa is a guaranteed subset across all admitted CPUs, not a complete host ISA listing. Other architectures return a zero RISC-V mask. The guarantee remains valid across local CPU migration; cross-machine migration is not implied.
 - WaitSets are process-local, non-transferable objects with capacity 1..1024. BIND_WAIT authorizes add/rearm/remove, WAIT authorizes consumption. Add requires source WAIT and reserves one event slot; WaitSet and CapabilityChannel sources are unsupported. Registration IDs are globally non-reused. Bind/rearm observe signal levels and sequence under the source lock; one-shot publication does not allocate. Rearm is busy until successful event consumption. Wait returns one exact 24-byte record (registration ID, signal bits, sequence), using an absolute monotonic deadline. Copyout failure restores the event unless removal or closure cancelled it. Source handle close does not cancel object-lifetime subscriptions; final set handle close detaches registrations and wakes consumers. Future CapabilityChannel subscriptions require ownership-epoch invalidation.
+- wait_set_wait_batch requires WAIT and takes deadline, output, capacity, record_size and options, with the sixth register reserved zero. Capacity is 1..64; record_size is eight-byte aligned, 24..4096 bytes. Options are currently zero. Invalid geometry/options are rejected before consuming events. It waits only until the first notification is available, using the absolute monotonic deadline, then consumes immediately available notifications up to capacity without waiting to fill the batch. Success returns count in value0 (1..capacity) and zero in value1. Each copied record has the wait_set_event prefix and a zeroed unknown tail. Only the returned prefix is valid; the next record may have been partially touched by a failed copy and must be ignored. Each complete record independently commits consumption. A later copy failure, cancellation or set closure returns an already committed prefix successfully; before any progress it reports the corresponding failure. Failed/uncommitted deliveries are restored unless removal or closure cancelled them. Batches are not atomic queue snapshots; other consumers and concurrent rearm may interleave. Rearm remains busy until that registration's delivery commits, and explicit removal may race an already selected notification. The original wait_set_wait operation retains its single-record contract.
 - ByteChannel duplicate authority permits shared endpoint ownership; peer_closed is published only when the last active endpoint handle closes. Internal operation pins, including WaitSet subscriptions, do not retain active endpoint authority.
 - process_get_current_id returns the calling Process KOID for observation only. It creates no handle or operational authority and is not a PID-to-handle lookup.
 - Handles are opaque nonzero process-local u64 values with bits 63..56 fixed to 0x0F. Zero is the absent/invalid handle sentinel; all other high-byte values are reserved and rejected as handles. Invocations return a separate signed status and unsigned result words. The low 56 bits are masked table-local data: callers must not infer slot/generation fields, allocation order, or numeric relationships. Slot reuse advances a wrapping generation without permanently retiring capacity; numeric values may repeat. Using a closed, replaced, or moved handle is a caller error and may operate on a later entry with that value. Inspector and retained crash records report the exact value held by the observed Process; queries use that Process namespace. Transfers publish destination-local values. Numeric values alone never grant authority outside the owning Process.
@@ -2989,6 +2991,26 @@ Object-local method `wait_set_wait`.
 | Results | — |
 | Capability effects | `wait_set: Borrow, kind=wait_set, rights=0x4` |
 | User memory | `output: Write, len=output_size bytes, max-bytes=24, record=wait_set_event; order=0` |
+| Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Capability` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `wait_set_wait_batch`
+
+Object-local method `wait_set_wait_batch`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `wait_set: Borrow, kind=wait_set, rights=0x4` |
+| Operation | 260 |
+| Feature | `Core` |
+| Arguments | `deadline: u64`, `output: user_address`, `capacity: element_count`, `record_size: byte_count`, `options: u64` |
+| Results | `count: element_count` |
+| Capability effects | `wait_set: Borrow, kind=wait_set, rights=0x4` |
+| User memory | `output: Write, len=capacity records, max-elements=64, stride=record_size bytes, max-stride=4096, record=wait_set_event; order=0` |
 | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Capability` |
 

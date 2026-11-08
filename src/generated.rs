@@ -583,6 +583,13 @@ pub const HYPER_NATIVE_DEADLINE_INFINITE: u64 = 18446744073709551615;
 /// Page geometry, record bounds, identity encoding and wait limits.
 /// Numeric parameter or sentinel, not an enum discriminant.
 pub const HYPER_NATIVE_OBJECT_WAIT_MANY_MAX_ITEMS: u64 = 64;
+/// `wait_set_batch_max_events` in the `core_limits` constants domain.
+///
+/// Page geometry, record bounds, identity encoding and wait limits.
+/// Numeric parameter or sentinel, not an enum discriminant.
+///
+/// Maximum events returned by one `WaitSet` batch, independently of set capacity.
+pub const HYPER_NATIVE_WAIT_SET_BATCH_MAX_EVENTS: u64 = 64;
 
 /// `system_config_page_size` in the `system_config` enum domain.
 ///
@@ -3846,6 +3853,25 @@ pub const HYPER_NATIVE_OP_WAIT_SET_REMOVE: u64 = 258;
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 pub const HYPER_NATIVE_OP_WAIT_SET_WAIT: u64 = 259;
 
+/// Object-local method `wait_set_wait_batch`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `wait_set: Borrow, kind=wait_set, rights=0x4` |
+/// | Operation | 260 |
+/// | Feature | `Core` |
+/// | Arguments | `deadline: u64`, `output: user_address`, `capacity: element_count`, `record_size: byte_count`, `options: u64` |
+/// | Results | `count: element_count` |
+/// | Capability effects | `wait_set: Borrow, kind=wait_set, rights=0x4` |
+/// | User memory | `output: Write, len=capacity records, max-elements=64, stride=record_size bytes, max-stride=4096, record=wait_set_event; order=0` |
+/// | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Capability` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_WAIT_SET_WAIT_BATCH: u64 = 260;
+
 /// Object-local method `process_get_current_id`.
 ///
 /// | Property | Contract |
@@ -6040,6 +6066,8 @@ pub enum NativeOperation {
     WaitSetRemove,
     /// Decoded method; see [`HYPER_NATIVE_OP_WAIT_SET_WAIT`] for its contract.
     WaitSetWait,
+    /// Decoded method; see [`HYPER_NATIVE_OP_WAIT_SET_WAIT_BATCH`] for its contract.
+    WaitSetWaitBatch,
     /// Decoded method; see [`HYPER_NATIVE_OP_PROCESS_GET_CURRENT_ID`] for its contract.
     ProcessGetCurrentId,
     /// Decoded method; see [`HYPER_NATIVE_OP_VIRTUAL_SERIAL_ACKNOWLEDGE_OUTPUT`] for its contract.
@@ -6403,6 +6431,7 @@ impl NativeOperation {
             (HYPER_NATIVE_OBJECT_WAIT_SET, HYPER_NATIVE_OP_WAIT_SET_REARM) => Some(Self::WaitSetRearm),
             (HYPER_NATIVE_OBJECT_WAIT_SET, HYPER_NATIVE_OP_WAIT_SET_REMOVE) => Some(Self::WaitSetRemove),
             (HYPER_NATIVE_OBJECT_WAIT_SET, HYPER_NATIVE_OP_WAIT_SET_WAIT) => Some(Self::WaitSetWait),
+            (HYPER_NATIVE_OBJECT_WAIT_SET, HYPER_NATIVE_OP_WAIT_SET_WAIT_BATCH) => Some(Self::WaitSetWaitBatch),
             (HYPER_NATIVE_OBJECT_EXECUTION_CONTEXT, HYPER_NATIVE_OP_PROCESS_GET_CURRENT_ID) => Some(Self::ProcessGetCurrentId),
             (HYPER_NATIVE_OBJECT_VIRTUAL_SERIAL, HYPER_NATIVE_OP_VIRTUAL_SERIAL_ACKNOWLEDGE_OUTPUT) => Some(Self::VirtualSerialAcknowledgeOutput),
             (HYPER_NATIVE_OBJECT_DIRECTORY, HYPER_NATIVE_OP_DIRECTORY_SCOPE_CREATE) => Some(Self::DirectoryScopeCreate),
@@ -6613,6 +6642,7 @@ impl NativeOperation {
             Self::WaitSetRearm => HYPER_NATIVE_OP_WAIT_SET_REARM,
             Self::WaitSetRemove => HYPER_NATIVE_OP_WAIT_SET_REMOVE,
             Self::WaitSetWait => HYPER_NATIVE_OP_WAIT_SET_WAIT,
+            Self::WaitSetWaitBatch => HYPER_NATIVE_OP_WAIT_SET_WAIT_BATCH,
             Self::ProcessGetCurrentId => HYPER_NATIVE_OP_PROCESS_GET_CURRENT_ID,
             Self::VirtualSerialAcknowledgeOutput => HYPER_NATIVE_OP_VIRTUAL_SERIAL_ACKNOWLEDGE_OUTPUT,
             Self::DirectoryScopeCreate => HYPER_NATIVE_OP_DIRECTORY_SCOPE_CREATE,
@@ -6822,6 +6852,7 @@ impl NativeOperation {
             Self::WaitSetRearm => Some(HYPER_NATIVE_OBJECT_WAIT_SET),
             Self::WaitSetRemove => Some(HYPER_NATIVE_OBJECT_WAIT_SET),
             Self::WaitSetWait => Some(HYPER_NATIVE_OBJECT_WAIT_SET),
+            Self::WaitSetWaitBatch => Some(HYPER_NATIVE_OBJECT_WAIT_SET),
             Self::ProcessGetCurrentId => Some(HYPER_NATIVE_OBJECT_EXECUTION_CONTEXT),
             Self::VirtualSerialAcknowledgeOutput => Some(HYPER_NATIVE_OBJECT_VIRTUAL_SERIAL),
             Self::DirectoryScopeCreate => Some(HYPER_NATIVE_OBJECT_DIRECTORY),
@@ -7031,6 +7062,7 @@ impl NativeOperation {
             Self::WaitSetRearm => 1,
             Self::WaitSetRemove => 1,
             Self::WaitSetWait => 3,
+            Self::WaitSetWaitBatch => 5,
             Self::ProcessGetCurrentId => 0,
             Self::VirtualSerialAcknowledgeOutput => 1,
             Self::DirectoryScopeCreate => 2,
@@ -7240,6 +7272,7 @@ impl NativeOperation {
             Self::WaitSetRearm => 1073741824,
             Self::WaitSetRemove => 1073741824,
             Self::WaitSetWait => 4,
+            Self::WaitSetWaitBatch => 4,
             Self::ProcessGetCurrentId => 16,
             Self::VirtualSerialAcknowledgeOutput => 16,
             Self::DirectoryScopeCreate => 16,
@@ -8893,7 +8926,7 @@ pub const HYPER_NATIVE_WAIT_SET_EVENT_MIN_SIZE: usize = 24;
 /// The minimum prefix describes extensibility, not permission to truncate every call's buffer;
 /// the consuming operation defines its accepted length.
 ///
-/// Used by: `wait_set_wait`.
+/// Used by: `wait_set_wait`, `wait_set_wait_batch`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct HyperNativeWaitSetEvent {
