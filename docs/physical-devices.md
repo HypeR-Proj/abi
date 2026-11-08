@@ -62,7 +62,7 @@ The existing `physical_device_info` record reports `device_id = 0` and
 the kernel does not identify. Its `mmio_size` remains nonzero. Virtio assignments
 continue to report their device identifier and transport version.
 
-`device_firmware_read` (143) borrows an assignment authority and a 24-byte query:
+[`device_firmware_read`](native.md#device_firmware_read) borrows an assignment authority and a 24-byte query:
 `node: u32`, `field: u32`, `name_address: u64`, `name_length: u64`. Node indices
 start at zero and are contiguous; `NOT_FOUND` ends enumeration. Fields are:
 
@@ -83,10 +83,15 @@ size in result value 0. Nonzero capacity copies the whole field or fails; output
 is bounded to 64 KiB. No physical addresses supplied by applications authorize
 access: firmware inspection and resource claims are separate operations.
 
-`device_claim_bundle` (144) takes up to eight 16-byte entries (`node: u32`,
+[`device_claim_bundle`](native.md#device_claim_bundle) takes up to eight 16-byte entries (`node: u32`,
 `resource: u32`, guest-aperture `offset: u64`) and an IRQ node index. The kernel
 checks exact firmware resources, overlap, kernel ownership, existing claims,
-and the 64 KiB aperture. This version supports exclusive level-triggered SPIs.
+and the 64 KiB aperture. The selected IRQ node may have no interrupt, producing
+a bundle with zero physical IRQs; otherwise it must describe an exclusive
+level-triggered SPI. Even an IRQ-free assignment reserves one guest IRQ number
+to avoid collisions, but does not activate a physical route. Userspace need not
+publish an interrupt in the guest device tree or run an IRQ consumer for such a
+device. Absence of an IRQ does not establish DMA quiescence or relax teardown.
 The returned PhysicalDevice has the userspace bundle rights listed above.
 
 After installing a generic assignment, the VM owner registers its exact 64 KiB
@@ -94,7 +99,7 @@ assigned aperture with `virtual_machine_register_mmio` before starting any vCPU.
 This permission belongs only to that VM's assignment; it does not enlarge the
 platform's ordinary userspace MMIO window or expose legacy kernel-handled devices.
 
-`device_mmio` (145) accepts device, offset, width, operation, and value. Widths
+[`device_mmio`](native.md#device_mmio) accepts device, offset, width, operation, and value. Widths
 are 1, 2, or 4 bytes. Operation 0 reads and requires value zero; operation 1 writes.
 Both reads and writes require an active assignment with retained DMA backing:
 even a register read can have device-specific side effects. Capability checks
@@ -103,12 +108,12 @@ covers resource bounds, alignment, rights and lifecycle; register semantics belo
 to userspace.
 
 The PhysicalDevice remains the authority for its existing bound VM/SPI route.
-`device_irq_pending` (146) returns zero when idle, otherwise a nonzero monotonic
+[`device_irq_pending`](native.md#device_irq_pending) returns zero when idle, otherwise a nonzero monotonic
 sequence. READABLE (bit 0) indicates a newly delivered notification. Physical
 delivery masks the source; notification publication and the final
 hardware mask belong to one IRQ registry transaction. Rearm is serialized after
 that transaction, so userspace acknowledgement cannot be overwritten by a late
-delivery mask. `device_irq_complete` (147) validates
+delivery mask. [`device_irq_complete`](native.md#device_irq_complete) validates
 the sequence and sets the guest IRQ level. Asserted=true keeps the physical source
 masked and its sequence pending, but consumes READABLE to prevent a busy loop.
 Userspace can query and reuse that sequence after a guest register write.
@@ -123,7 +128,7 @@ or stopping the driver does not permit releasing pages still reachable by DMA.
 
 ## DMA fault observation
 
-`device_dma_fault_info` (183) returns the first retained containment report for
+[`device_dma_fault_info`](native.md#device_dma_fault_info) returns the first retained containment report for
 this device; its 40-byte record is defined in the [Native ABI](native.md).
 `DMA_FAULT` (bit 1) is a sticky wait signal, independent of IRQ `READABLE`.
 Inspection and IRQ acknowledgement neither consume this report nor clear that
