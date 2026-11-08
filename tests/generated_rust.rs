@@ -64,6 +64,22 @@ fn object_local_operations_decode_and_mask_failures_by_receiver_kind() {
         generated::HYPER_NATIVE_RIGHT_WAIT
     );
     assert_eq!(generated::HYPER_NATIVE_WAIT_SET_BATCH_MAX_EVENTS, 64);
+    assert_eq!(generated::HYPER_NATIVE_OP_VMO_WAIT_U32, 260);
+    assert_eq!(generated::HYPER_NATIVE_OP_VMO_WAKE_U32, 261);
+    assert_eq!(NativeOperation::VmoWaitU32.argument_count(), 4);
+    assert_eq!(NativeOperation::VmoWakeU32.argument_count(), 3);
+    assert_eq!(
+        NativeOperation::VmoWaitU32.receiver_rights(),
+        generated::HYPER_NATIVE_RIGHT_READ | generated::HYPER_NATIVE_RIGHT_WRITE
+    );
+    assert_eq!(
+        NativeOperation::VmoWakeU32.receiver_rights(),
+        generated::HYPER_NATIVE_RIGHT_WRITE
+    );
+    assert_eq!(
+        NativeOperation::from_raw(generated::HYPER_NATIVE_OBJECT_VMO, 260),
+        Some(NativeOperation::VmoWaitU32)
+    );
     assert_eq!(NativeOperation::ThreadCreate.argument_count(), 2);
     assert_eq!(NativeOperation::FileReadAt.argument_count(), 4);
     assert_eq!(

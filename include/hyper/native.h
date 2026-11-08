@@ -16,6 +16,8 @@
 /**
  * @page hyper_native_contract Native ABI semantic contract
  *
+ * - vmo_wait_u32 and vmo_wake_u32 use explicit shared identity (VMO object, byte offset), independent of process addresses or mapping lineage. Wait requires READ|WRITE, wake requires WRITE, and neither requires MAP. Offset is four-byte aligned with offset+4 inside an ordinary writable RAM VMO; immutable snapshots, executable and observation VMOs are rejected. Options and unused argument registers must be zero. Expected and count are u32 values without high bits. Wait compares the aligned atomic u32 and registers under the same wait-key lock: mismatch returns OK without sleeping. Deadline is absolute monotonic nanoseconds; timeout or thread cancellation releases the registration. An OK wait is only a wake hint and requires rechecking the shared condition. Wake returns the actual number notified up to count; zero count is a validated no-op, not a broadcast. Closing handles or unmapping does not cancel an admitted shared wait. Its retained object identity, page pin and writable admission survive until unlink; snapshots, ordinary VMO byte access and exclusive hardware admission for the entire VMO remain BUSY while that admission lives. A wait encountering existing hardware-exclusive ownership returns BUSY. Wake does not load, populate or lease backing and may return zero while hardware owns the VMO. All concurrently accessed aliases of an active shared word must use aligned same-width atomic u32 operations, with application-defined release/acquire ordering; non-atomic or overlapping mixed-width access is invalid. Wait-control and pin charges belong to the waiter; first materialization of sparse backing remains charged to the VMO owner. Private address-based atomic_wait/atomic_wake retain their existing independent identity and cannot wake these shared registrations.
+ *
  * - loader_startup optionally supplies vdso_image and vdso_data VMO handles as a pair; both zero means unavailable. The loader maps the matching ELF image read/execute and its observation segment read-only/non-executable, closes these handles after mapping, and supplies the image base as auxv VDSO_AUXV_BASE (33). The image describes its code/data placement through PT_LOAD segments; applications must not depend on private data offsets. Live observation backing refuses writable/executable mappings, writes, snapshots and private COW views. Mapping lifetime is independent of SystemInfo and the startup VMO handles: closing them does not revoke public clock or capture-activity observations.
  *
  * - The optional vDSO exports versioned ELF symbols __hyper_vdso_monotonic_v1, __hyper_vdso_realtime_v1 and __hyper_vdso_ipc_active_v1. Each is a no-argument C function returning a struct of three consecutive 64-bit members: signed status, unsigned value0, unsigned value1. Successful clock results match the corresponding clock_get operation; IPC activity returns value0 zero or one and value1 zero. A missing image/symbol or NOT_SUPPORTED clock result selects the existing invocation path. IPC activity is an advisory hint only: missing support conservatively retains annotation invocations. It grants no capture authority or generation correlation. A supported inactive hint suppresses new BEGIN annotations; existing END generation checks remain authoritative. Capture-boundary races are best effort. The vDSO exposes no cold system configuration or capability-scoped observations.
@@ -6122,6 +6124,48 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
  */
 #define HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT UINT64_C(258)
+
+/**
+ * Object-local method `vmo_wait_u32`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `vmo: Borrow, kind=vmo, rights=0x30` |
+ * | Operation | 260 |
+ * | Feature | `Core` |
+ * | Arguments | `offset: u64`, `expected: u32`, `deadline: u64`, `options: u64` |
+ * | Results | — |
+ * | Capability effects | `vmo: Borrow, kind=vmo, rights=0x30` |
+ * | User memory | — |
+ * | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_VMO_WAIT_U32 UINT64_C(260)
+
+/**
+ * Object-local method `vmo_wake_u32`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `vmo: Borrow, kind=vmo, rights=0x20` |
+ * | Operation | 261 |
+ * | Feature | `Core` |
+ * | Arguments | `offset: u64`, `count: u32`, `options: u64` |
+ * | Results | `woken: u64` |
+ * | Capability effects | `vmo: Borrow, kind=vmo, rights=0x20` |
+ * | User memory | — |
+ * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_VMO_WAKE_U32 UINT64_C(261)
 
 /**
  * Object-local method `vmar_map_private`.
