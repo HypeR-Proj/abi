@@ -2602,6 +2602,34 @@ pub const INVOCATIONS: &[Invocation] = &[
         flags: FlagPolicy::None,
         failure_results: &[],
     },
+    Invocation {
+        operation: 256,
+        name: "executable_publish",
+        feature: FeatureGate::Core,
+        receiver: invocation_receiver("executable_authority", RIGHT_CREATE_EXECUTABLE),
+        arguments: &[
+            vmo_argument(RIGHT_READ),
+            scalar_argument("options", ValueKind::U64),
+        ],
+        results: &[
+            ResultValue {
+                name: "vmo",
+                kind: ValueKind::Handle,
+                handle: Some(ProducedHandle {
+                    object: ProducedObject::Kind("vmo"),
+                    rights: ProducedRights::Fixed(VMO_EXECUTABLE_RIGHTS),
+                }),
+            },
+            scalar_result("byte_size", ValueKind::ByteCount),
+        ],
+        blocking: BlockingClass::MayBlock,
+        cancellation: CancellationClass::None,
+        restart: RestartClass::Never,
+        completion: CompletionClass::Returns,
+        audit: AuditClass::Capability,
+        flags: FlagPolicy::Strict,
+        failure_results: &[],
+    },
     // This snapshots an authorized VMO, not arbitrary filesystem content.
     // Hardware-owned or exclusively leased backing has additional access exclusions.
     Invocation {
