@@ -4252,6 +4252,44 @@ pub const HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_GET_PLATFORM_INFO: u64 
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 pub const HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT: u64 = 258;
 
+/// Object-local method `vmo_wait_u32`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `vmo: Borrow, kind=vmo, rights=0x30` |
+/// | Operation | 260 |
+/// | Feature | `Core` |
+/// | Arguments | `offset: u64`, `expected: u32`, `deadline: u64`, `options: u64` |
+/// | Results | — |
+/// | Capability effects | `vmo: Borrow, kind=vmo, rights=0x30` |
+/// | User memory | — |
+/// | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_VMO_WAIT_U32: u64 = 260;
+
+/// Object-local method `vmo_wake_u32`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `vmo: Borrow, kind=vmo, rights=0x20` |
+/// | Operation | 261 |
+/// | Feature | `Core` |
+/// | Arguments | `offset: u64`, `count: u32`, `options: u64` |
+/// | Results | `woken: u64` |
+/// | Capability effects | `vmo: Borrow, kind=vmo, rights=0x20` |
+/// | User memory | — |
+/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_VMO_WAKE_U32: u64 = 261;
+
 /// Object-local method `vmar_map_private`.
 ///
 /// | Property | Contract |
@@ -6108,6 +6146,10 @@ pub enum NativeOperation {
     VirtualMachineCreationLeaseGetPlatformInfo,
     /// Decoded method; see [`HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT`] for its contract.
     VmoCreateSnapshot,
+    /// Decoded method; see [`HYPER_NATIVE_OP_VMO_WAIT_U32`] for its contract.
+    VmoWaitU32,
+    /// Decoded method; see [`HYPER_NATIVE_OP_VMO_WAKE_U32`] for its contract.
+    VmoWakeU32,
     /// Decoded method; see [`HYPER_NATIVE_OP_VMAR_MAP_PRIVATE`] for its contract.
     VmarMapPrivate,
     /// Decoded method; see [`HYPER_NATIVE_OP_VIRTUAL_MACHINE_GET_POWER_REQUEST`] for its contract.
@@ -6452,6 +6494,8 @@ impl NativeOperation {
             (HYPER_NATIVE_OBJECT_SYSTEM_INFO, HYPER_NATIVE_OP_CLOCK_GET_REALTIME) => Some(Self::ClockGetRealtime),
             (HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE_CREATION_LEASE, HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_GET_PLATFORM_INFO) => Some(Self::VirtualMachineCreationLeaseGetPlatformInfo),
             (HYPER_NATIVE_OBJECT_VMO, HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT) => Some(Self::VmoCreateSnapshot),
+            (HYPER_NATIVE_OBJECT_VMO, HYPER_NATIVE_OP_VMO_WAIT_U32) => Some(Self::VmoWaitU32),
+            (HYPER_NATIVE_OBJECT_VMO, HYPER_NATIVE_OP_VMO_WAKE_U32) => Some(Self::VmoWakeU32),
             (HYPER_NATIVE_OBJECT_VMAR, HYPER_NATIVE_OP_VMAR_MAP_PRIVATE) => Some(Self::VmarMapPrivate),
             (HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE, HYPER_NATIVE_OP_VIRTUAL_MACHINE_GET_POWER_REQUEST) => Some(Self::VirtualMachineGetPowerRequest),
             (HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE, HYPER_NATIVE_OP_VIRTUAL_MACHINE_COMPLETE_POWER_REQUEST) => Some(Self::VirtualMachineCompletePowerRequest),
@@ -6663,6 +6707,8 @@ impl NativeOperation {
             Self::ClockGetRealtime => HYPER_NATIVE_OP_CLOCK_GET_REALTIME,
             Self::VirtualMachineCreationLeaseGetPlatformInfo => HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_GET_PLATFORM_INFO,
             Self::VmoCreateSnapshot => HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT,
+            Self::VmoWaitU32 => HYPER_NATIVE_OP_VMO_WAIT_U32,
+            Self::VmoWakeU32 => HYPER_NATIVE_OP_VMO_WAKE_U32,
             Self::VmarMapPrivate => HYPER_NATIVE_OP_VMAR_MAP_PRIVATE,
             Self::VirtualMachineGetPowerRequest => HYPER_NATIVE_OP_VIRTUAL_MACHINE_GET_POWER_REQUEST,
             Self::VirtualMachineCompletePowerRequest => HYPER_NATIVE_OP_VIRTUAL_MACHINE_COMPLETE_POWER_REQUEST,
@@ -6873,6 +6919,8 @@ impl NativeOperation {
             Self::ClockGetRealtime => Some(HYPER_NATIVE_OBJECT_SYSTEM_INFO),
             Self::VirtualMachineCreationLeaseGetPlatformInfo => Some(HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE_CREATION_LEASE),
             Self::VmoCreateSnapshot => Some(HYPER_NATIVE_OBJECT_VMO),
+            Self::VmoWaitU32 => Some(HYPER_NATIVE_OBJECT_VMO),
+            Self::VmoWakeU32 => Some(HYPER_NATIVE_OBJECT_VMO),
             Self::VmarMapPrivate => Some(HYPER_NATIVE_OBJECT_VMAR),
             Self::VirtualMachineGetPowerRequest => Some(HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE),
             Self::VirtualMachineCompletePowerRequest => Some(HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE),
@@ -7083,6 +7131,8 @@ impl NativeOperation {
             Self::ClockGetRealtime => 0,
             Self::VirtualMachineCreationLeaseGetPlatformInfo => 3,
             Self::VmoCreateSnapshot => 0,
+            Self::VmoWaitU32 => 4,
+            Self::VmoWakeU32 => 3,
             Self::VmarMapPrivate => 3,
             Self::VirtualMachineGetPowerRequest => 2,
             Self::VirtualMachineCompletePowerRequest => 2,
@@ -7293,6 +7343,8 @@ impl NativeOperation {
             Self::ClockGetRealtime => 16,
             Self::VirtualMachineCreationLeaseGetPlatformInfo => 8,
             Self::VmoCreateSnapshot => 16,
+            Self::VmoWaitU32 => 48,
+            Self::VmoWakeU32 => 32,
             Self::VmarMapPrivate => 64,
             Self::VirtualMachineGetPowerRequest => 32,
             Self::VirtualMachineCompletePowerRequest => 32,
