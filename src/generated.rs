@@ -4233,6 +4233,25 @@ pub const HYPER_NATIVE_OP_CLOCK_GET_REALTIME: u64 = 258;
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 pub const HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_GET_PLATFORM_INFO: u64 = 257;
 
+/// Object-local method `executable_publish`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=executable_authority, rights=0x2000000` |
+/// | Operation | 256 |
+/// | Feature | `Core` |
+/// | Arguments | `vmo: handle`, `options: u64` |
+/// | Results | `vmo: handle`, `byte_size: byte_count` |
+/// | Capability effects | `receiver: Borrow, kind=executable_authority, rights=0x2000000`, `vmo: Borrow, kind=vmo, rights=0x10`, `vmo: produce, kind=vmo, fixed=0xdb` |
+/// | User memory | — |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Capability` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_EXECUTABLE_PUBLISH: u64 = 256;
+
 /// Object-local method `vmo_create_snapshot`.
 ///
 /// | Property | Contract |
@@ -6144,6 +6163,8 @@ pub enum NativeOperation {
     ClockGetRealtime,
     /// Decoded method; see [`HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_GET_PLATFORM_INFO`] for its contract.
     VirtualMachineCreationLeaseGetPlatformInfo,
+    /// Decoded method; see [`HYPER_NATIVE_OP_EXECUTABLE_PUBLISH`] for its contract.
+    ExecutablePublish,
     /// Decoded method; see [`HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT`] for its contract.
     VmoCreateSnapshot,
     /// Decoded method; see [`HYPER_NATIVE_OP_VMO_WAIT_U32`] for its contract.
@@ -6493,6 +6514,7 @@ impl NativeOperation {
             (HYPER_NATIVE_OBJECT_FILE, HYPER_NATIVE_OP_FILE_UNLOCK) => Some(Self::FileUnlock),
             (HYPER_NATIVE_OBJECT_SYSTEM_INFO, HYPER_NATIVE_OP_CLOCK_GET_REALTIME) => Some(Self::ClockGetRealtime),
             (HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE_CREATION_LEASE, HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_GET_PLATFORM_INFO) => Some(Self::VirtualMachineCreationLeaseGetPlatformInfo),
+            (HYPER_NATIVE_OBJECT_EXECUTABLE_AUTHORITY, HYPER_NATIVE_OP_EXECUTABLE_PUBLISH) => Some(Self::ExecutablePublish),
             (HYPER_NATIVE_OBJECT_VMO, HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT) => Some(Self::VmoCreateSnapshot),
             (HYPER_NATIVE_OBJECT_VMO, HYPER_NATIVE_OP_VMO_WAIT_U32) => Some(Self::VmoWaitU32),
             (HYPER_NATIVE_OBJECT_VMO, HYPER_NATIVE_OP_VMO_WAKE_U32) => Some(Self::VmoWakeU32),
@@ -6706,6 +6728,7 @@ impl NativeOperation {
             Self::FileUnlock => HYPER_NATIVE_OP_FILE_UNLOCK,
             Self::ClockGetRealtime => HYPER_NATIVE_OP_CLOCK_GET_REALTIME,
             Self::VirtualMachineCreationLeaseGetPlatformInfo => HYPER_NATIVE_OP_VIRTUAL_MACHINE_CREATION_LEASE_GET_PLATFORM_INFO,
+            Self::ExecutablePublish => HYPER_NATIVE_OP_EXECUTABLE_PUBLISH,
             Self::VmoCreateSnapshot => HYPER_NATIVE_OP_VMO_CREATE_SNAPSHOT,
             Self::VmoWaitU32 => HYPER_NATIVE_OP_VMO_WAIT_U32,
             Self::VmoWakeU32 => HYPER_NATIVE_OP_VMO_WAKE_U32,
@@ -6918,6 +6941,7 @@ impl NativeOperation {
             Self::FileUnlock => Some(HYPER_NATIVE_OBJECT_FILE),
             Self::ClockGetRealtime => Some(HYPER_NATIVE_OBJECT_SYSTEM_INFO),
             Self::VirtualMachineCreationLeaseGetPlatformInfo => Some(HYPER_NATIVE_OBJECT_VIRTUAL_MACHINE_CREATION_LEASE),
+            Self::ExecutablePublish => Some(HYPER_NATIVE_OBJECT_EXECUTABLE_AUTHORITY),
             Self::VmoCreateSnapshot => Some(HYPER_NATIVE_OBJECT_VMO),
             Self::VmoWaitU32 => Some(HYPER_NATIVE_OBJECT_VMO),
             Self::VmoWakeU32 => Some(HYPER_NATIVE_OBJECT_VMO),
@@ -7130,6 +7154,7 @@ impl NativeOperation {
             Self::FileUnlock => 0,
             Self::ClockGetRealtime => 0,
             Self::VirtualMachineCreationLeaseGetPlatformInfo => 3,
+            Self::ExecutablePublish => 2,
             Self::VmoCreateSnapshot => 0,
             Self::VmoWaitU32 => 4,
             Self::VmoWakeU32 => 3,
@@ -7342,6 +7367,7 @@ impl NativeOperation {
             Self::FileUnlock => 4294967296,
             Self::ClockGetRealtime => 16,
             Self::VirtualMachineCreationLeaseGetPlatformInfo => 8,
+            Self::ExecutablePublish => 33554432,
             Self::VmoCreateSnapshot => 16,
             Self::VmoWaitU32 => 48,
             Self::VmoWakeU32 => 32,

@@ -81,6 +81,16 @@ fn object_local_operations_decode_and_mask_failures_by_receiver_kind() {
         Some(NativeOperation::VmoWaitU32)
     );
     assert_eq!(NativeOperation::ThreadCreate.argument_count(), 2);
+    assert_eq!(generated::HYPER_NATIVE_OP_EXECUTABLE_PUBLISH, 256);
+    assert_eq!(
+        NativeOperation::from_raw(generated::HYPER_NATIVE_OBJECT_EXECUTABLE_AUTHORITY, 256),
+        Some(NativeOperation::ExecutablePublish)
+    );
+    assert_eq!(NativeOperation::ExecutablePublish.argument_count(), 2);
+    assert_eq!(
+        NativeOperation::ExecutablePublish.receiver_rights(),
+        generated::HYPER_NATIVE_RIGHT_CREATE_EXECUTABLE
+    );
     assert_eq!(NativeOperation::FileReadAt.argument_count(), 4);
     assert_eq!(
         NativeOperation::from_raw(u32::MAX, generated::HYPER_NATIVE_OP_HANDLE_CLOSE),

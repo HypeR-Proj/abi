@@ -913,6 +913,7 @@ RISC-V ISA extensions accepted in guest configuration.
 
 ## Semantic rules
 
+- executable_publish requires ExecutableAuthority CREATE_EXECUTABLE and source VMO READ. Options and unused argument registers must be zero. Only an ordinary writable RAM VMO is accepted: snapshots, executable and observation sources are rejected. The operation coherently copies the entire source into physically distinct immutable backing; active writable mappings, shared atomic waits or exclusive hardware ownership report BUSY. Success returns a new VMO and its byte size, with READ|MAP|EXECUTE|INSPECT|DUPLICATE|TRANSFER rights and never WRITE. Source handles and contents remain owned by the caller and can be modified after publication without changing the executable result. Destination backing and publication metadata are charged to the calling process, not the source sponsor. Architecture instruction-cache publication completes before exposing the handle. No writable alias is created for executable backing; mapping or protecting it writable, or mapping ordinary writable VMOs executable, remains forbidden. Publication does not validate machine instructions, ABI correctness or control flow. The kernel initially delegates executable authority only to init; userspace explicitly routes attenuated authority to selected components, with no ambient ObjectFactory mint or default application grant.
 - vmo_wait_u32 and vmo_wake_u32 use explicit shared identity (VMO object, byte offset), independent of process addresses or mapping lineage. Wait requires READ|WRITE, wake requires WRITE, and neither requires MAP. Offset is four-byte aligned with offset+4 inside an ordinary writable RAM VMO; immutable snapshots, executable and observation VMOs are rejected. Options and unused argument registers must be zero. Expected and count are u32 values without high bits. Wait compares the aligned atomic u32 and registers under the same wait-key lock: mismatch returns OK without sleeping. Deadline is absolute monotonic nanoseconds; timeout or thread cancellation releases the registration. An OK wait is only a wake hint and requires rechecking the shared condition. Wake returns the actual number notified up to count; zero count is a validated no-op, not a broadcast. Closing handles or unmapping does not cancel an admitted shared wait. Its retained object identity, page pin and writable admission survive until unlink; snapshots, ordinary VMO byte access and exclusive hardware admission for the entire VMO remain BUSY while that admission lives. A wait encountering existing hardware-exclusive ownership returns BUSY. Wake does not load, populate or lease backing and may return zero while hardware owns the VMO. All concurrently accessed aliases of an active shared word must use aligned same-width atomic u32 operations, with application-defined release/acquire ordering; non-atomic or overlapping mixed-width access is invalid. Wait-control and pin charges belong to the waiter; first materialization of sparse backing remains charged to the VMO owner. Private address-based atomic_wait/atomic_wake retain their existing independent identity and cannot wake these shared registrations.
 - loader_startup optionally supplies vdso_image and vdso_data VMO handles as a pair; both zero means unavailable. The loader maps the matching ELF image read/execute and its observation segment read-only/non-executable, closes these handles after mapping, and supplies the image base as auxv VDSO_AUXV_BASE (33). The image describes its code/data placement through PT_LOAD segments; applications must not depend on private data offsets. Live observation backing refuses writable/executable mappings, writes, snapshots and private COW views. Mapping lifetime is independent of SystemInfo and the startup VMO handles: closing them does not revoke public clock or capture-activity observations.
 - The optional vDSO exports versioned ELF symbols __hyper_vdso_monotonic_v1, __hyper_vdso_realtime_v1 and __hyper_vdso_ipc_active_v1. Each is a no-argument C function returning a struct of three consecutive 64-bit members: signed status, unsigned value0, unsigned value1. Successful clock results match the corresponding clock_get operation; IPC activity returns value0 zero or one and value1 zero. A missing image/symbol or NOT_SUPPORTED clock result selects the existing invocation path. IPC activity is an advisory hint only: missing support conservatively retains annotation invocations. It grants no capture authority or generation correlation. A supported inactive hint suppresses new BEGIN annotations; existing END generation checks remain authoritative. Capture-boundary races are best effort. The vDSO exposes no cold system configuration or capability-scoped observations.
@@ -3394,6 +3395,26 @@ Object-local method `virtual_machine_creation_lease_get_platform_info`.
 | User memory | `info: Write, len=info_size bytes, max-bytes=4096, record=virtual_machine_platform_info; order=0` |
 | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=None` |
 | Audit | `Object` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `executable_publish`
+
+Object-local method `executable_publish`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `receiver: Borrow, kind=executable_authority, rights=0x2000000` |
+| Operation | 256 |
+| Feature | `Core` |
+| Arguments | `vmo: handle`, `options: u64` |
+| Results | `vmo: handle`, `byte_size: byte_count` |
+| Capability effects | `receiver: Borrow, kind=executable_authority, rights=0x2000000`, `vmo: Borrow, kind=vmo, rights=0x10`, `vmo: produce, kind=vmo, fixed=0xdb` |
+| User memory | — |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Capability` |
 
 Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
 
