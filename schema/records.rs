@@ -2563,6 +2563,87 @@ pub const RECORDS: &[Record] = &[
         alignment: 8,
     },
     Record {
+        name: "shared_file_mapping",
+        fields: &[
+            Field {
+                name: "file_offset",
+                kind: FieldKind::U64,
+                offset: 0,
+            },
+            Field {
+                name: "address",
+                kind: FieldKind::U64,
+                offset: 8,
+            },
+            Field {
+                name: "length",
+                kind: FieldKind::U64,
+                offset: 16,
+            },
+            Field {
+                name: "permissions",
+                kind: FieldKind::U32,
+                offset: 24,
+            },
+            Field {
+                name: "options",
+                kind: FieldKind::U32,
+                offset: 28,
+            },
+            Field {
+                name: "reserved0",
+                kind: FieldKind::U64,
+                offset: 32,
+            },
+            Field {
+                name: "reserved1",
+                kind: FieldKind::U64,
+                offset: 40,
+            },
+        ],
+        minimum_size: 32,
+        size: 48,
+        alignment: 8,
+    },
+    Record {
+        name: "shared_file_sync",
+        fields: &[
+            Field {
+                name: "address",
+                kind: FieldKind::U64,
+                offset: 0,
+            },
+            Field {
+                name: "length",
+                kind: FieldKind::U64,
+                offset: 8,
+            },
+            Field {
+                name: "scope",
+                kind: FieldKind::U32,
+                offset: 16,
+            },
+            Field {
+                name: "options",
+                kind: FieldKind::U32,
+                offset: 20,
+            },
+            Field {
+                name: "reserved0",
+                kind: FieldKind::U64,
+                offset: 24,
+            },
+            Field {
+                name: "reserved1",
+                kind: FieldKind::U64,
+                offset: 32,
+            },
+        ],
+        minimum_size: 24,
+        size: 40,
+        alignment: 8,
+    },
+    Record {
         name: "virtual_machine_platform_info",
         fields: &[
             Field {

@@ -98,6 +98,10 @@
  *
  * - file_prefetch requires File READ and synchronously attempts to fill the clean cache for offset/length without a user buffer. Length is at most FILE_MAX_PREFETCH_BYTES (512 KiB); overflow or larger requests are INVALID_ARGUMENT. Reads are clipped to EOF and may fill surrounding complete file pages. The result is the completed requested prefix, possibly zero for an uncached backend, an oversized page-rounded range, or cache admission failure. Backend errors propagate. This is optional preparation, not a content snapshot or residency guarantee: pages remain reclaimable and ordinary reads/mappings must still handle misses. It neither changes the per-open sequential predictor nor queues further read-ahead. Hold content protection separately when planning stable executable ranges.
  *
+ * - vmar_map_file_shared requires MAP on a VMAR of the calling Process and READ on a regular File. Shared writable authority additionally requires File WRITE; the source handle's READ/WRITE rights form the retained permission ceiling, with no EXECUTE authority. Even an initially read-only mapping retains a potential-write lease when that ceiling admits WRITE. vmar_protect cannot raise that ceiling. shared_file_mapping describes an exact page-aligned nonempty virtual range and page-aligned file offset wholly within existing complete file pages; it has no private zero-fill or copy-back semantics. Permissions are READ or READ|WRITE. Options, reserved fields and unknown record suffix bytes must be zero. The first implementation requires a healthy provider which delegated periodic writeback to VFS; synchronous providers such as FAT return NOT_SUPPORTED. Mapping does not imply LOCK_MEMORY; explicit residency locking of shared-file ranges is currently NOT_SUPPORTED. Address-keyed local atomic wait/wake also rejects these mappings; use an independent coordination object. FileProtection and potential shared writers are mutually exclusive. While shared extent leases remain, real file-size changes and removal of the mapped remote file return BUSY; in-range ordinary file I/O shares the same canonical bytes. Closing File does not revoke mappings; unmap and Process exit retire mappings but are not durability fences. Hardware faults that cannot be serviced retain the existing fatal-fault policy. Shared file mappings do not export ordinary VMO authority or extend VMO atomic wait/wake to file-page identities.
+ *
+ * - vmar_sync_file_range requires VMAR MAP and a nonempty page-aligned range wholly covered by shared mappings of one canonical file with contiguous file offsets and retained WRITE authority. Validate the entire request and retain generation-qualified source owners before effects; concurrent unmap/remap cannot redirect its fence to another file. shared_file_sync scope accepts FILE_SYNC_DATA or FILE_SYNC_ALL, never FILE_SYNC_VOLUME. Options and reserved bytes are zero. It may perform a stronger whole-file fence. Existing file_sync also includes mapped modifications. Both capture a finite synchronization boundary and preserve later redirty generations; concurrent later stores may be included but are not promised. File scopes retain the backend recovery-log semantics, not an unconditional checkpoint. Unrecoverable provider or writeback failure must not be reported as success. Shared bytes require application synchronization; neither ordinary I/O nor sync promises an atomic snapshot of unsynchronized concurrent stores.
+ *
  * - PROTECT grants authority to acquire content protection, not READ, WRITE or EXECUTE. Directory/file derivation can only attenuate this right. file_protect returns a process-local nonduplicable, nontransferable FileProtection with MAP|INSPECT and the size observed under protection. Protection rejects writes and resize through every alias but does not freeze names or other metadata. Closing the token releases its reference; protected file mappings retain separate references until unmap or owner-process teardown. After all owner threads stop and its handles close, teardown detaches protected sources without allocation. External VMAR owners can retain the dead address space and its charged pages, but not protection or permission to refill from the file. vmar_map_file requires File READ, additionally EXECUTE for executable mappings, FileProtection MAP for that same canonical file, and MAP on a VMAR of the calling process. It uses private_mapping range/zero-fill semantics. COPY_ON_WRITE permits clean pages to retire after translation invalidation and fault back from the protected file. Both file mapping modes populate clean pageable contents; EAGER does not grant residency. Full clean pages share canonical cache storage, while partial pages and private writes remain isolated. LOCK_MEMORY on a process-owned VMAR authorizes vmar_lock_memory/ vmar_unlock_memory. Range calls require page-aligned nonempty ranges; VMAR_MEMORY_CURRENT selects only currently mapped pages, including descendants, with address and size zero. Lock success populates the range and charges PinnedPages to the requester; repeated lock is idempotent. Unmap and process teardown release locks; future mappings are not locked. Shared pages remain cached while a mapping retains them. ProcessBuilder memory-lock delegation requires TaskFactory LOCK_MEMORY and explicit enablement before seal. Both modes retain protection until unmap or owner-process teardown; private modified pages cannot be discarded without another backing store. File snapshot VMOs are not exported to userspace. Explicit mapping and user-buffer copy syscalls report allocation, quota or I/O failures. Hardware refaults have no syscall result; when bounded reclaim/refill retries fail, the kernel terminates the Process as an unhandled page fault. Reclaim is best effort and page-table withdrawal may require temporary transaction resources before releasing pages.
  *
  * - Immutable VMO snapshots grant READ and MAP but never WRITE. vmo_create_snapshot coherently copies its source and reports Busy while writable mappings or hardware writers exist. Private mappings require source READ|MAP and VMAR MAP: source_offset is page aligned, data_offset is less than one page, source_length bytes starting at source_offset+data_offset initialize destination data_offset; all other destination bytes are zero. Writable private views never permit EXECUTE. Executable private views additionally require an executable source VMO and source EXECUTE rights; sanitized pages are sealed and instruction-published before mapping, with no writable alias. Copy-on-write mode shares immutable full pages until first write; eager mode allocates all private pages before publication. Private writes, including kernel copyout and atomic waits, cannot change the source or another private view. Ordinary writable/shared VMOs and exclusive hardware leases keep their stable backing contract. Snapshot bytes and old page versions remain owned through acknowledged translation retirement.
@@ -7031,6 +7035,48 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
 #define HYPER_NATIVE_OP_VMAR_MAP_FILE UINT64_C(262)
 
 /**
+ * Object-local method `vmar_map_file_shared`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `vmar: Borrow, kind=vmar, rights=0x40` |
+ * | Operation | 265 |
+ * | Feature | `Core` |
+ * | Arguments | `file: handle`, `mapping: user_address`, `mapping_size: byte_count` |
+ * | Results | — |
+ * | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `file: Borrow, kind=file, rights=0x10` |
+ * | User memory | `mapping: Read, len=mapping_size bytes, max-bytes=4096, record=shared_file_mapping; order=0` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Capability` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_VMAR_MAP_FILE_SHARED UINT64_C(265)
+
+/**
+ * Object-local method `vmar_sync_file_range`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `vmar: Borrow, kind=vmar, rights=0x40` |
+ * | Operation | 266 |
+ * | Feature | `Core` |
+ * | Arguments | `sync: user_address`, `sync_size: byte_count` |
+ * | Results | — |
+ * | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
+ * | User memory | `sync: Read, len=sync_size bytes, max-bytes=4096, record=shared_file_sync; order=0` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Capability` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_VMAR_SYNC_FILE_RANGE UINT64_C(266)
+
+/**
  * Object-local method `directory_begin_read`.
  *
  * | Property | Contract |
@@ -9889,6 +9935,109 @@ HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_private_mapping_t, size) == 24, "p
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_private_mapping_t, data_offset) == 32, "private_mapping.data_offset offset");
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_private_mapping_t, permissions) == 40, "private_mapping.permissions offset");
 HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_private_mapping_t, mode) == 44, "private_mapping.mode offset");
+
+/**
+ * Minimum supported prefix of `shared_file_mapping`, in bytes; individual calls define their buffer lengths.
+ */
+#define HYPER_NATIVE_SHARED_FILE_MAPPING_MIN_SIZE UINT64_C(32)
+/**
+ * Wire layout for `shared_file_mapping`.
+ *
+ * Size: 48 bytes; alignment: 8 bytes; supported minimum prefix: 32 bytes.
+ * Scalar widths and member offsets are fixed across supported architectures.
+ * The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+ * the consuming operation defines its accepted length.
+ *
+ * Used by: `vmar_map_file_shared`.
+ */
+typedef struct hyper_native_shared_file_mapping_t {
+    /**
+     * Wire offset 0 bytes; width 8 bytes.
+     */
+    uint64_t file_offset;
+    /**
+     * Wire offset 8 bytes; width 8 bytes.
+     */
+    uint64_t address;
+    /**
+     * Wire offset 16 bytes; width 8 bytes.
+     */
+    uint64_t length;
+    /**
+     * Wire offset 24 bytes; width 4 bytes.
+     */
+    uint32_t permissions;
+    /**
+     * Wire offset 28 bytes; width 4 bytes.
+     */
+    uint32_t options;
+    /**
+     * Wire offset 32 bytes; width 8 bytes.
+     */
+    uint64_t reserved0;
+    /**
+     * Wire offset 40 bytes; width 8 bytes.
+     */
+    uint64_t reserved1;
+} hyper_native_shared_file_mapping_t;
+HYPER_ABI_STATIC_ASSERT(sizeof(hyper_native_shared_file_mapping_t) == 48, "shared_file_mapping size");
+HYPER_ABI_STATIC_ASSERT(HYPER_ABI_ALIGNOF(hyper_native_shared_file_mapping_t) == 8, "shared_file_mapping alignment");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_mapping_t, file_offset) == 0, "shared_file_mapping.file_offset offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_mapping_t, address) == 8, "shared_file_mapping.address offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_mapping_t, length) == 16, "shared_file_mapping.length offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_mapping_t, permissions) == 24, "shared_file_mapping.permissions offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_mapping_t, options) == 28, "shared_file_mapping.options offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_mapping_t, reserved0) == 32, "shared_file_mapping.reserved0 offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_mapping_t, reserved1) == 40, "shared_file_mapping.reserved1 offset");
+
+/**
+ * Minimum supported prefix of `shared_file_sync`, in bytes; individual calls define their buffer lengths.
+ */
+#define HYPER_NATIVE_SHARED_FILE_SYNC_MIN_SIZE UINT64_C(24)
+/**
+ * Wire layout for `shared_file_sync`.
+ *
+ * Size: 40 bytes; alignment: 8 bytes; supported minimum prefix: 24 bytes.
+ * Scalar widths and member offsets are fixed across supported architectures.
+ * The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+ * the consuming operation defines its accepted length.
+ *
+ * Used by: `vmar_sync_file_range`.
+ */
+typedef struct hyper_native_shared_file_sync_t {
+    /**
+     * Wire offset 0 bytes; width 8 bytes.
+     */
+    uint64_t address;
+    /**
+     * Wire offset 8 bytes; width 8 bytes.
+     */
+    uint64_t length;
+    /**
+     * Wire offset 16 bytes; width 4 bytes.
+     */
+    uint32_t scope;
+    /**
+     * Wire offset 20 bytes; width 4 bytes.
+     */
+    uint32_t options;
+    /**
+     * Wire offset 24 bytes; width 8 bytes.
+     */
+    uint64_t reserved0;
+    /**
+     * Wire offset 32 bytes; width 8 bytes.
+     */
+    uint64_t reserved1;
+} hyper_native_shared_file_sync_t;
+HYPER_ABI_STATIC_ASSERT(sizeof(hyper_native_shared_file_sync_t) == 40, "shared_file_sync size");
+HYPER_ABI_STATIC_ASSERT(HYPER_ABI_ALIGNOF(hyper_native_shared_file_sync_t) == 8, "shared_file_sync alignment");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_sync_t, address) == 0, "shared_file_sync.address offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_sync_t, length) == 8, "shared_file_sync.length offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_sync_t, scope) == 16, "shared_file_sync.scope offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_sync_t, options) == 20, "shared_file_sync.options offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_sync_t, reserved0) == 24, "shared_file_sync.reserved0 offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_shared_file_sync_t, reserved1) == 32, "shared_file_sync.reserved1 offset");
 
 /**
  * Minimum supported prefix of `virtual_machine_platform_info`, in bytes; individual calls define their buffer lengths.

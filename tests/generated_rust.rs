@@ -329,3 +329,40 @@ fn generated_rust_layouts_are_compiler_checked() {
         0b1
     );
 }
+
+#[test]
+fn shared_file_mapping_operations_and_extensible_layouts_are_distinct() {
+    use generated::*;
+    assert_eq!(HYPER_NATIVE_OP_VMAR_MAP_FILE_SHARED, 265);
+    assert_eq!(HYPER_NATIVE_OP_VMAR_SYNC_FILE_RANGE, 266);
+    assert_eq!(NativeOperation::VmarMapFileShared.argument_count(), 3);
+    assert_eq!(NativeOperation::VmarSyncFileRange.argument_count(), 2);
+    for operation in [
+        NativeOperation::VmarMapFileShared,
+        NativeOperation::VmarSyncFileRange,
+    ] {
+        assert_eq!(operation.receiver_kind(), Some(HYPER_NATIVE_OBJECT_VMAR));
+        assert_eq!(operation.receiver_rights(), HYPER_NATIVE_RIGHT_MAP);
+        assert_eq!(
+            operation.failure_result_mask(HYPER_NATIVE_STATUS_INVALID_ARGUMENT),
+            0
+        );
+    }
+    assert_eq!(core::mem::size_of::<HyperNativeSharedFileMapping>(), 48);
+    assert_eq!(
+        core::mem::offset_of!(HyperNativeSharedFileMapping, permissions),
+        24
+    );
+    assert_eq!(
+        core::mem::offset_of!(HyperNativeSharedFileMapping, reserved0),
+        32
+    );
+    assert_eq!(HYPER_NATIVE_SHARED_FILE_MAPPING_MIN_SIZE, 32);
+    assert_eq!(core::mem::size_of::<HyperNativeSharedFileSync>(), 40);
+    assert_eq!(core::mem::offset_of!(HyperNativeSharedFileSync, scope), 16);
+    assert_eq!(
+        core::mem::offset_of!(HyperNativeSharedFileSync, reserved0),
+        24
+    );
+    assert_eq!(HYPER_NATIVE_SHARED_FILE_SYNC_MIN_SIZE, 24);
+}

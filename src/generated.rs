@@ -5069,6 +5069,44 @@ pub const HYPER_NATIVE_OP_FILE_PROTECT: u64 = 265;
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 pub const HYPER_NATIVE_OP_VMAR_MAP_FILE: u64 = 262;
 
+/// Object-local method `vmar_map_file_shared`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `vmar: Borrow, kind=vmar, rights=0x40` |
+/// | Operation | 265 |
+/// | Feature | `Core` |
+/// | Arguments | `file: handle`, `mapping: user_address`, `mapping_size: byte_count` |
+/// | Results | — |
+/// | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `file: Borrow, kind=file, rights=0x10` |
+/// | User memory | `mapping: Read, len=mapping_size bytes, max-bytes=4096, record=shared_file_mapping; order=0` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Capability` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_VMAR_MAP_FILE_SHARED: u64 = 265;
+
+/// Object-local method `vmar_sync_file_range`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `vmar: Borrow, kind=vmar, rights=0x40` |
+/// | Operation | 266 |
+/// | Feature | `Core` |
+/// | Arguments | `sync: user_address`, `sync_size: byte_count` |
+/// | Results | — |
+/// | Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
+/// | User memory | `sync: Read, len=sync_size bytes, max-bytes=4096, record=shared_file_sync; order=0` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Capability` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_VMAR_SYNC_FILE_RANGE: u64 = 266;
+
 /// Object-local method `directory_begin_read`.
 ///
 /// | Property | Contract |
@@ -6251,6 +6289,10 @@ pub enum NativeOperation {
     FileProtect,
     /// Decoded method; see [`HYPER_NATIVE_OP_VMAR_MAP_FILE`] for its contract.
     VmarMapFile,
+    /// Decoded method; see [`HYPER_NATIVE_OP_VMAR_MAP_FILE_SHARED`] for its contract.
+    VmarMapFileShared,
+    /// Decoded method; see [`HYPER_NATIVE_OP_VMAR_SYNC_FILE_RANGE`] for its contract.
+    VmarSyncFileRange,
     /// Decoded method; see [`HYPER_NATIVE_OP_DIRECTORY_BEGIN_READ`] for its contract.
     DirectoryBeginRead,
     /// Decoded method; see [`HYPER_NATIVE_OP_PROCESS_DERIVE_OBSERVER`] for its contract.
@@ -6558,6 +6600,8 @@ impl NativeOperation {
             (HYPER_NATIVE_OBJECT_FILE, HYPER_NATIVE_OP_FILE_PREFETCH) => Some(Self::FilePrefetch),
             (HYPER_NATIVE_OBJECT_FILE, HYPER_NATIVE_OP_FILE_PROTECT) => Some(Self::FileProtect),
             (HYPER_NATIVE_OBJECT_VMAR, HYPER_NATIVE_OP_VMAR_MAP_FILE) => Some(Self::VmarMapFile),
+            (HYPER_NATIVE_OBJECT_VMAR, HYPER_NATIVE_OP_VMAR_MAP_FILE_SHARED) => Some(Self::VmarMapFileShared),
+            (HYPER_NATIVE_OBJECT_VMAR, HYPER_NATIVE_OP_VMAR_SYNC_FILE_RANGE) => Some(Self::VmarSyncFileRange),
             (HYPER_NATIVE_OBJECT_DIRECTORY, HYPER_NATIVE_OP_DIRECTORY_BEGIN_READ) => Some(Self::DirectoryBeginRead),
             (HYPER_NATIVE_OBJECT_PROCESS, HYPER_NATIVE_OP_PROCESS_DERIVE_OBSERVER) => Some(Self::ProcessDeriveObserver),
             (HYPER_NATIVE_OBJECT_TASK_GROUP, HYPER_NATIVE_OP_TASK_GROUP_REQUEST_STOP) => Some(Self::TaskGroupRequestStop),
@@ -6772,6 +6816,8 @@ impl NativeOperation {
             Self::FilePrefetch => HYPER_NATIVE_OP_FILE_PREFETCH,
             Self::FileProtect => HYPER_NATIVE_OP_FILE_PROTECT,
             Self::VmarMapFile => HYPER_NATIVE_OP_VMAR_MAP_FILE,
+            Self::VmarMapFileShared => HYPER_NATIVE_OP_VMAR_MAP_FILE_SHARED,
+            Self::VmarSyncFileRange => HYPER_NATIVE_OP_VMAR_SYNC_FILE_RANGE,
             Self::DirectoryBeginRead => HYPER_NATIVE_OP_DIRECTORY_BEGIN_READ,
             Self::ProcessDeriveObserver => HYPER_NATIVE_OP_PROCESS_DERIVE_OBSERVER,
             Self::TaskGroupRequestStop => HYPER_NATIVE_OP_TASK_GROUP_REQUEST_STOP,
@@ -6985,6 +7031,8 @@ impl NativeOperation {
             Self::FilePrefetch => Some(HYPER_NATIVE_OBJECT_FILE),
             Self::FileProtect => Some(HYPER_NATIVE_OBJECT_FILE),
             Self::VmarMapFile => Some(HYPER_NATIVE_OBJECT_VMAR),
+            Self::VmarMapFileShared => Some(HYPER_NATIVE_OBJECT_VMAR),
+            Self::VmarSyncFileRange => Some(HYPER_NATIVE_OBJECT_VMAR),
             Self::DirectoryBeginRead => Some(HYPER_NATIVE_OBJECT_DIRECTORY),
             Self::ProcessDeriveObserver => Some(HYPER_NATIVE_OBJECT_PROCESS),
             Self::TaskGroupRequestStop => Some(HYPER_NATIVE_OBJECT_TASK_GROUP),
@@ -7198,6 +7246,8 @@ impl NativeOperation {
             Self::FilePrefetch => 2,
             Self::FileProtect => 0,
             Self::VmarMapFile => 4,
+            Self::VmarMapFileShared => 3,
+            Self::VmarSyncFileRange => 2,
             Self::DirectoryBeginRead => 0,
             Self::ProcessDeriveObserver => 0,
             Self::TaskGroupRequestStop => 0,
@@ -7411,6 +7461,8 @@ impl NativeOperation {
             Self::FilePrefetch => 16,
             Self::FileProtect => 34359738368,
             Self::VmarMapFile => 64,
+            Self::VmarMapFileShared => 64,
+            Self::VmarSyncFileRange => 64,
             Self::DirectoryBeginRead => 16,
             Self::ProcessDeriveObserver => 2054,
             Self::TaskGroupRequestStop => 2048,
@@ -8833,6 +8885,79 @@ const _: () = assert!(core::mem::offset_of!(HyperNativePrivateMapping, size) == 
 const _: () = assert!(core::mem::offset_of!(HyperNativePrivateMapping, data_offset) == 32);
 const _: () = assert!(core::mem::offset_of!(HyperNativePrivateMapping, permissions) == 40);
 const _: () = assert!(core::mem::offset_of!(HyperNativePrivateMapping, mode) == 44);
+
+/// Minimum supported prefix of `shared_file_mapping`, in bytes; individual calls define their buffer lengths.
+pub const HYPER_NATIVE_SHARED_FILE_MAPPING_MIN_SIZE: usize = 32;
+/// Wire layout for `shared_file_mapping`.
+///
+/// Size: 48 bytes; alignment: 8 bytes; supported minimum prefix: 32 bytes.
+/// Scalar widths and member offsets are fixed across supported architectures.
+/// The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+/// the consuming operation defines its accepted length.
+///
+/// Used by: `vmar_map_file_shared`.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HyperNativeSharedFileMapping {
+    /// Wire offset 0 bytes; width 8 bytes.
+    pub file_offset: u64,
+    /// Wire offset 8 bytes; width 8 bytes.
+    pub address: u64,
+    /// Wire offset 16 bytes; width 8 bytes.
+    pub length: u64,
+    /// Wire offset 24 bytes; width 4 bytes.
+    pub permissions: u32,
+    /// Wire offset 28 bytes; width 4 bytes.
+    pub options: u32,
+    /// Wire offset 32 bytes; width 8 bytes.
+    pub reserved0: u64,
+    /// Wire offset 40 bytes; width 8 bytes.
+    pub reserved1: u64,
+}
+const _: () = assert!(core::mem::size_of::<HyperNativeSharedFileMapping>() == 48);
+const _: () = assert!(core::mem::align_of::<HyperNativeSharedFileMapping>() == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileMapping, file_offset) == 0);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileMapping, address) == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileMapping, length) == 16);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileMapping, permissions) == 24);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileMapping, options) == 28);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileMapping, reserved0) == 32);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileMapping, reserved1) == 40);
+
+/// Minimum supported prefix of `shared_file_sync`, in bytes; individual calls define their buffer lengths.
+pub const HYPER_NATIVE_SHARED_FILE_SYNC_MIN_SIZE: usize = 24;
+/// Wire layout for `shared_file_sync`.
+///
+/// Size: 40 bytes; alignment: 8 bytes; supported minimum prefix: 24 bytes.
+/// Scalar widths and member offsets are fixed across supported architectures.
+/// The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+/// the consuming operation defines its accepted length.
+///
+/// Used by: `vmar_sync_file_range`.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HyperNativeSharedFileSync {
+    /// Wire offset 0 bytes; width 8 bytes.
+    pub address: u64,
+    /// Wire offset 8 bytes; width 8 bytes.
+    pub length: u64,
+    /// Wire offset 16 bytes; width 4 bytes.
+    pub scope: u32,
+    /// Wire offset 20 bytes; width 4 bytes.
+    pub options: u32,
+    /// Wire offset 24 bytes; width 8 bytes.
+    pub reserved0: u64,
+    /// Wire offset 32 bytes; width 8 bytes.
+    pub reserved1: u64,
+}
+const _: () = assert!(core::mem::size_of::<HyperNativeSharedFileSync>() == 40);
+const _: () = assert!(core::mem::align_of::<HyperNativeSharedFileSync>() == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileSync, address) == 0);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileSync, length) == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileSync, scope) == 16);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileSync, options) == 20);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileSync, reserved0) == 24);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSharedFileSync, reserved1) == 32);
 
 /// Minimum supported prefix of `virtual_machine_platform_info`, in bytes; individual calls define their buffer lengths.
 pub const HYPER_NATIVE_VIRTUAL_MACHINE_PLATFORM_INFO_MIN_SIZE: usize = 32;

@@ -954,6 +954,8 @@ RISC-V ISA extensions accepted in guest configuration.
 - filesystem_unmount requires Directory WRITE|EXECUTE and an exact mounted-root path. The namespace root cannot be detached. Live File, Directory, cwd, path-resolution or nested-mount uses return busy. Admission closes before synchronous backend flush and namespace publication; no mount-table spinlock is held across backend IPC. A failed flush or concurrent topology change leaves the mount attached. Successful detach permanently retires its transport health and content identity, so retained snapshots or speculative cache work cannot revive the old mount. Userspace then stops and joins the worker and retires its block queue before reusing the volume; the syscall itself does not terminate processes or release backend DMA mappings.
 - VM power control requires WRITE authority. virtual_machine_get_power_request returns a non-consuming snapshot of one pending request, or would_block when none exists. Request IDs identify one completion and stale IDs are rejected. Operations are CPU_ON (1), CPU_OFF (2), SYSTEM_OFF (3), and SYSTEM_RESET (4); accept is strictly 0 or 1. Reserved output is zero. POWER_REQUEST signals pending work, and VCPU_TERMINATED prompts inspection of per-vCPU terminal state. virtual_machine_open_vcpu returns a control handle for an already configured vCPU; it does not change the immutable topology. The runtime owns lifecycle policy; no guest request is forwarded to host firmware. Guest suspend operations remain unsupported.
 - file_prefetch requires File READ and synchronously attempts to fill the clean cache for offset/length without a user buffer. Length is at most FILE_MAX_PREFETCH_BYTES (512 KiB); overflow or larger requests are INVALID_ARGUMENT. Reads are clipped to EOF and may fill surrounding complete file pages. The result is the completed requested prefix, possibly zero for an uncached backend, an oversized page-rounded range, or cache admission failure. Backend errors propagate. This is optional preparation, not a content snapshot or residency guarantee: pages remain reclaimable and ordinary reads/mappings must still handle misses. It neither changes the per-open sequential predictor nor queues further read-ahead. Hold content protection separately when planning stable executable ranges.
+- vmar_map_file_shared requires MAP on a VMAR of the calling Process and READ on a regular File. Shared writable authority additionally requires File WRITE; the source handle's READ/WRITE rights form the retained permission ceiling, with no EXECUTE authority. Even an initially read-only mapping retains a potential-write lease when that ceiling admits WRITE. vmar_protect cannot raise that ceiling. shared_file_mapping describes an exact page-aligned nonempty virtual range and page-aligned file offset wholly within existing complete file pages; it has no private zero-fill or copy-back semantics. Permissions are READ or READ|WRITE. Options, reserved fields and unknown record suffix bytes must be zero. The first implementation requires a healthy provider which delegated periodic writeback to VFS; synchronous providers such as FAT return NOT_SUPPORTED. Mapping does not imply LOCK_MEMORY; explicit residency locking of shared-file ranges is currently NOT_SUPPORTED. Address-keyed local atomic wait/wake also rejects these mappings; use an independent coordination object. FileProtection and potential shared writers are mutually exclusive. While shared extent leases remain, real file-size changes and removal of the mapped remote file return BUSY; in-range ordinary file I/O shares the same canonical bytes. Closing File does not revoke mappings; unmap and Process exit retire mappings but are not durability fences. Hardware faults that cannot be serviced retain the existing fatal-fault policy. Shared file mappings do not export ordinary VMO authority or extend VMO atomic wait/wake to file-page identities.
+- vmar_sync_file_range requires VMAR MAP and a nonempty page-aligned range wholly covered by shared mappings of one canonical file with contiguous file offsets and retained WRITE authority. Validate the entire request and retain generation-qualified source owners before effects; concurrent unmap/remap cannot redirect its fence to another file. shared_file_sync scope accepts FILE_SYNC_DATA or FILE_SYNC_ALL, never FILE_SYNC_VOLUME. Options and reserved bytes are zero. It may perform a stronger whole-file fence. Existing file_sync also includes mapped modifications. Both capture a finite synchronization boundary and preserve later redirty generations; concurrent later stores may be included but are not promised. File scopes retain the backend recovery-log semantics, not an unconditional checkpoint. Unrecoverable provider or writeback failure must not be reported as success. Shared bytes require application synchronization; neither ordinary I/O nor sync promises an atomic snapshot of unsynchronized concurrent stores.
 - PROTECT grants authority to acquire content protection, not READ, WRITE or EXECUTE. Directory/file derivation can only attenuate this right. file_protect returns a process-local nonduplicable, nontransferable FileProtection with MAP|INSPECT and the size observed under protection. Protection rejects writes and resize through every alias but does not freeze names or other metadata. Closing the token releases its reference; protected file mappings retain separate references until unmap or owner-process teardown. After all owner threads stop and its handles close, teardown detaches protected sources without allocation. External VMAR owners can retain the dead address space and its charged pages, but not protection or permission to refill from the file. vmar_map_file requires File READ, additionally EXECUTE for executable mappings, FileProtection MAP for that same canonical file, and MAP on a VMAR of the calling process. It uses private_mapping range/zero-fill semantics. COPY_ON_WRITE permits clean pages to retire after translation invalidation and fault back from the protected file. Both file mapping modes populate clean pageable contents; EAGER does not grant residency. Full clean pages share canonical cache storage, while partial pages and private writes remain isolated. LOCK_MEMORY on a process-owned VMAR authorizes vmar_lock_memory/ vmar_unlock_memory. Range calls require page-aligned nonempty ranges; VMAR_MEMORY_CURRENT selects only currently mapped pages, including descendants, with address and size zero. Lock success populates the range and charges PinnedPages to the requester; repeated lock is idempotent. Unmap and process teardown release locks; future mappings are not locked. Shared pages remain cached while a mapping retains them. ProcessBuilder memory-lock delegation requires TaskFactory LOCK_MEMORY and explicit enablement before seal. Both modes retain protection until unmap or owner-process teardown; private modified pages cannot be discarded without another backing store. File snapshot VMOs are not exported to userspace. Explicit mapping and user-buffer copy syscalls report allocation, quota or I/O failures. Hardware refaults have no syscall result; when bounded reclaim/refill retries fail, the kernel terminates the Process as an unhandled page fault. Reclaim is best effort and page-table withdrawal may require temporary transaction resources before releasing pages.
 - Immutable VMO snapshots grant READ and MAP but never WRITE. vmo_create_snapshot coherently copies its source and reports Busy while writable mappings or hardware writers exist. Private mappings require source READ|MAP and VMAR MAP: source_offset is page aligned, data_offset is less than one page, source_length bytes starting at source_offset+data_offset initialize destination data_offset; all other destination bytes are zero. Writable private views never permit EXECUTE. Executable private views additionally require an executable source VMO and source EXECUTE rights; sanitized pages are sealed and instruction-published before mapping, with no writable alias. Copy-on-write mode shares immutable full pages until first write; eager mode allocates all private pages before publication. Private writes, including kernel copyout and atomic waits, cannot change the source or another private view. Ordinary writable/shared VMOs and exclusive hardware leases keep their stable backing contract. Snapshot bytes and old page versions remain owned through acknowledged translation retirement.
 - VM platform inspection borrows an INSPECT creation lease without consuming it. Metadata describes the selected local platform: counter_frequency_hz is the actual guest counter frequency, and riscv_isa is a guaranteed subset across all admitted CPUs, not a complete host ISA listing. Other architectures return a zero RISC-V mask. The guarantee remains valid across local CPU migration; cross-machine migration is not implied.
@@ -4280,6 +4282,46 @@ Arguments and auxiliary results follow the listed register order; neither list i
 
 Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 
+### `vmar_map_file_shared`
+
+Object-local method `vmar_map_file_shared`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `vmar: Borrow, kind=vmar, rights=0x40` |
+| Operation | 265 |
+| Feature | `Core` |
+| Arguments | `file: handle`, `mapping: user_address`, `mapping_size: byte_count` |
+| Results | — |
+| Capability effects | `vmar: Borrow, kind=vmar, rights=0x40`, `file: Borrow, kind=file, rights=0x10` |
+| User memory | `mapping: Read, len=mapping_size bytes, max-bytes=4096, record=shared_file_mapping; order=0` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Capability` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `vmar_sync_file_range`
+
+Object-local method `vmar_sync_file_range`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `vmar: Borrow, kind=vmar, rights=0x40` |
+| Operation | 266 |
+| Feature | `Core` |
+| Arguments | `sync: user_address`, `sync_size: byte_count` |
+| Results | — |
+| Capability effects | `vmar: Borrow, kind=vmar, rights=0x40` |
+| User memory | `sync: Read, len=sync_size bytes, max-bytes=4096, record=shared_file_sync; order=0` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Capability` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
 ### `directory_begin_read`
 
 Object-local method `directory_begin_read`.
@@ -5671,6 +5713,33 @@ Minimum prefix: 48 bytes; size: 48 bytes; alignment: 8 bytes.
 | 32 | `data_offset` | `u64` |
 | 40 | `permissions` | `u32` |
 | 44 | `mode` | `u32` |
+
+### `shared_file_mapping`
+
+Minimum prefix: 32 bytes; size: 48 bytes; alignment: 8 bytes.
+
+| Offset | Field | Type |
+| ---: | --- | --- |
+| 0 | `file_offset` | `u64` |
+| 8 | `address` | `u64` |
+| 16 | `length` | `u64` |
+| 24 | `permissions` | `u32` |
+| 28 | `options` | `u32` |
+| 32 | `reserved0` | `u64` |
+| 40 | `reserved1` | `u64` |
+
+### `shared_file_sync`
+
+Minimum prefix: 24 bytes; size: 40 bytes; alignment: 8 bytes.
+
+| Offset | Field | Type |
+| ---: | --- | --- |
+| 0 | `address` | `u64` |
+| 8 | `length` | `u64` |
+| 16 | `scope` | `u32` |
+| 20 | `options` | `u32` |
+| 24 | `reserved0` | `u64` |
+| 32 | `reserved1` | `u64` |
 
 ### `virtual_machine_platform_info`
 

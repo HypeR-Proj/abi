@@ -4178,6 +4178,71 @@ pub const INVOCATIONS: &[Invocation] = &[
         flags: FlagPolicy::None,
         failure_results: &[],
     },
+    Invocation {
+        operation: 265,
+        name: "vmar_map_file_shared",
+        feature: FeatureGate::Core,
+        receiver: vmar_argument(RIGHT_MAP),
+        arguments: &[
+            file_argument(RIGHT_READ),
+            Argument {
+                name: "mapping",
+                kind: ValueKind::UserAddress,
+                handle: None,
+                memory: Some(UserMemory {
+                    direction: MemoryDirection::Read,
+                    length: MemoryLength::Bytes {
+                        argument: "mapping_size",
+                        maximum_bytes: EXTENSIBLE_RECORD_MAX_BYTES,
+                    },
+                    record: Some("shared_file_mapping"),
+                    handles: None,
+                    validation_order: 0,
+                }),
+            },
+            scalar_argument("mapping_size", ValueKind::ByteCount),
+        ],
+        results: &[],
+        blocking: BlockingClass::MayBlock,
+        cancellation: CancellationClass::None,
+        restart: RestartClass::Never,
+        completion: CompletionClass::Returns,
+        audit: AuditClass::Capability,
+        flags: FlagPolicy::Strict,
+        failure_results: &[],
+    },
+    Invocation {
+        operation: 266,
+        name: "vmar_sync_file_range",
+        feature: FeatureGate::Core,
+        receiver: vmar_argument(RIGHT_MAP),
+        arguments: &[
+            Argument {
+                name: "sync",
+                kind: ValueKind::UserAddress,
+                handle: None,
+                memory: Some(UserMemory {
+                    direction: MemoryDirection::Read,
+                    length: MemoryLength::Bytes {
+                        argument: "sync_size",
+                        maximum_bytes: EXTENSIBLE_RECORD_MAX_BYTES,
+                    },
+                    record: Some("shared_file_sync"),
+                    handles: None,
+                    validation_order: 0,
+                }),
+            },
+            scalar_argument("sync_size", ValueKind::ByteCount),
+        ],
+        results: &[],
+        blocking: BlockingClass::MayBlock,
+        cancellation: CancellationClass::None,
+        restart: RestartClass::Never,
+        completion: CompletionClass::Returns,
+        audit: AuditClass::Capability,
+        flags: FlagPolicy::Strict,
+        failure_results: &[],
+    },
     // Open an independent traversal position. Stream handles share progress when
     // duplicated, but they do not pin directory-cache pages or promise a snapshot.
     Invocation {
