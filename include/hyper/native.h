@@ -16,6 +16,14 @@
 /**
  * @page hyper_native_contract Native ABI semantic contract
  *
+ * - sync_domain_create creates an independently charged synchronization domain. SyncDomain has no object-level signal source: its word operations require SYNC_WAIT and SYNC_WAKE, not generic WAIT or SIGNAL. bind copies sync_domain_binding once, requires domain and VMO SYNC_CONFIGURE plus VMO WRITE, and binds a nonempty eight-byte-aligned ordinary writable RAM range. Canonical backing-relative overlapping bindings must name the same domain; conflicting domains are rejected. Closing handles does not unbind storage or reset lock words. Domain identity is fixed for the backing lifetime. Aliases normalize to the same backing and absolute offset. Shared u32 waits retain their separate namespace.
+ *
+ * - sync_domain_join registers only the invoking Thread, is idempotent within that domain, and returns a nonzero token at most SYNC_OWNER_TOKEN_MAX. Successfully issued tokens never repeat. A failed join issues no token. Closing handles or abandoning the local participant view does not declare a live Thread dead. owner_query returns INVALID for zero or never-issued tokens, LIVE for active participants, and DEAD only after actual terminal detach, never merely a stop request. DEAD observation has Acquire visibility of the owner's completed writes before its final stop. It does not establish consistency of partially completed application updates and grants no Thread control authority.
+ *
+ * - sync_domain_wait_u64 requires domain SYNC_WAIT and copies sync_domain_wait once. The VMO needs READ|WRITE and the selected eight-byte-aligned word must belong to this domain's bound range. cancellation is zero or an Event with WAIT; its SIGNALED level cancels this wait. The full u64 comparison, owner lifetime observation and wait registration close wake/exit/cancellation admission races. Mismatch returns RECHECK; a matching word with the observed owner confirmed dead returns OWNER_EXITED and that token. Other notifications return RECHECK and owner zero. After capability and binding validation, invalid owner tokens fail INVALID_ARGUMENT even on a word mismatch. For valid tokens, an immediate mismatch or already-observed owner death is returned before timer/event enrollment; after enrollment the sources arbitrate one winner. A result never acquires a mutex. Deadline is absolute monotonic nanoseconds; UINT64_MAX is infinite. Cancellation returns CANCELLED, timeout TIMED_OUT. Closing handles or unmapping after admission does not release the retained backing before registration cleanup. One completion arbitrates word wake, domain death, cancellation and timer. Every actual joined Thread exit notifies eligible domain waiters because their remembered owner can be obsolete after wake-one handoff. Kernel does not parse held-lock lists, application owner bits or payload.
+ *
+ * - sync_domain_wake_u64 requires domain SYNC_WAKE and VMO WRITE, validates binding and returns the actual count notified up to the u32 count. Zero count is a validated no-op; UINT32_MAX permits waking all. It never modifies the word. Shared mutex release uses Release store before wake; recovery must query/observe DEAD then CAS the exact full word, with Acquire ownership. SYNC_MUTEX_WAITERS is a notification obligation, not a waiter count. Kernel observations remain distinct from SDK OwnerDied acquisition. The SDK preserves wake-one relay when a selected waiter cancels, times out or fails, while thread death supplies domain notification. Uncontended mutex operations require no syscall after join and binding. All options, reserved fields, unknown record tails and unused argument registers are zero.
+ *
  * - executable_publish requires ExecutableAuthority CREATE_EXECUTABLE and source VMO READ. Options and unused argument registers must be zero. Only an ordinary writable RAM VMO is accepted: snapshots, executable and observation sources are rejected. The operation coherently copies the entire source into physically distinct immutable backing; active writable mappings, shared atomic waits or exclusive hardware ownership report BUSY. Success returns a new VMO and its byte size, with READ|MAP|EXECUTE|INSPECT|DUPLICATE|TRANSFER rights and never WRITE. Source handles and contents remain owned by the caller and can be modified after publication without changing the executable result. Destination backing and publication metadata are charged to the calling process, not the source sponsor. Architecture instruction-cache publication completes before exposing the handle. No writable alias is created for executable backing; mapping or protecting it writable, or mapping ordinary writable VMOs executable, remains forbidden. Publication does not validate machine instructions, ABI correctness or control flow. The kernel initially delegates executable authority only to init; userspace explicitly routes attenuated authority to selected components, with no ambient ObjectFactory mint or default application grant.
  *
  * - vmo_wait_u32 and vmo_wake_u32 use explicit shared identity (VMO object, byte offset), independent of process addresses or mapping lineage. Wait requires READ|WRITE, wake requires WRITE, and neither requires MAP. Offset is four-byte aligned with offset+4 inside an ordinary writable RAM VMO; immutable snapshots, executable and observation VMOs are rejected. Options and unused argument registers must be zero. Expected and count are u32 values without high bits. Wait compares the aligned atomic u32 and registers under the same wait-key lock: mismatch returns OK without sleeping. Deadline is absolute monotonic nanoseconds; timeout or thread cancellation releases the registration. An OK wait is only a wake hint and requires rechecking the shared condition. Wake returns the actual number notified up to count; zero count is a validated no-op, not a broadcast. Closing handles or unmapping does not cancel an admitted shared wait. Its retained object identity, page pin and writable admission survive until unlink; snapshots, ordinary VMO byte access and exclusive hardware admission for the entire VMO remain BUSY while that admission lives. A wait encountering existing hardware-exclusive ownership returns BUSY. Wake does not load, populate or lease backing and may return zero while hardware owns the VMO. All concurrently accessed aliases of an active shared word must use aligned same-width atomic u32 operations, with application-defined release/acquire ordering; non-atomic or overlapping mixed-width access is invalid. Wait-control and pin charges belong to the waiter; first materialization of sparse backing remains charged to the VMO owner. Private address-based atomic_wait/atomic_wake retain their existing independent identity and cannot wake these shared registrations.
@@ -578,6 +586,10 @@ typedef int64_t hyper_native_status_t;
  * Object-kind tag `block_queue` used with an object-local operation number.
  */
 #define HYPER_NATIVE_OBJECT_BLOCK_QUEUE UINT32_C(44)
+/**
+ * Object-kind tag `sync_domain` used with an object-local operation number.
+ */
+#define HYPER_NATIVE_OBJECT_SYNC_DOMAIN UINT32_C(45)
 
 /**
  * Handle transport is forbidden for this object kind.
@@ -643,6 +655,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
         case HYPER_NATIVE_OBJECT_OBJECT_FACTORY: return HYPER_NATIVE_TRANSFER_CLASS_FORBIDDEN;
         case HYPER_NATIVE_OBJECT_SYSTEM_INFO: return HYPER_NATIVE_TRANSFER_CLASS_GENERAL;
         case HYPER_NATIVE_OBJECT_BLOCK_QUEUE: return HYPER_NATIVE_TRANSFER_CLASS_RENDEZVOUS_ONLY;
+        case HYPER_NATIVE_OBJECT_SYNC_DOMAIN: return HYPER_NATIVE_TRANSFER_CLASS_GENERAL;
         default: return HYPER_NATIVE_TRANSFER_CLASS_FORBIDDEN;
     }
 }
@@ -823,11 +836,27 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Capability right; the receiving object's method determines the required rights: `sched_budget`.
  */
 #define HYPER_NATIVE_RIGHT_SCHED_BUDGET (UINT64_C(1) << 43)
+/**
+ * Capability right; the receiving object's method determines the required rights: `sync_configure`.
+ */
+#define HYPER_NATIVE_RIGHT_SYNC_CONFIGURE (UINT64_C(1) << 44)
+/**
+ * Capability right; the receiving object's method determines the required rights: `sync_join`.
+ */
+#define HYPER_NATIVE_RIGHT_SYNC_JOIN (UINT64_C(1) << 45)
+/**
+ * Capability right; the receiving object's method determines the required rights: `sync_wait`.
+ */
+#define HYPER_NATIVE_RIGHT_SYNC_WAIT (UINT64_C(1) << 46)
+/**
+ * Capability right; the receiving object's method determines the required rights: `sync_wake`.
+ */
+#define HYPER_NATIVE_RIGHT_SYNC_WAKE (UINT64_C(1) << 47)
 
 /**
  * All declared right bits; this mask does not grant authority to a handle.
  */
-#define HYPER_NATIVE_RIGHTS_MASK UINT64_C(0xfffffffffff)
+#define HYPER_NATIVE_RIGHTS_MASK UINT64_C(0xffffffffffff)
 
 /**
  * Wait signal `ready` for `process_retirement` objects; bit positions are object-local.
@@ -957,6 +986,93 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * Wait signal `peer_closed` for `block_queue` objects; bit positions are object-local.
  */
 #define HYPER_NATIVE_SIGNAL_BLOCK_QUEUE_PEER_CLOSED (UINT64_C(1) << 2)
+
+/**
+ * @defgroup hyper_native_sync_owner_state sync_owner_state (enum)
+ * @ingroup hyper_native
+ * Synchronization participant lifetime observations; Invalid is never recoverable.
+ * @{
+ */
+/**
+ * `sync_owner_invalid` in the `sync_owner_state` enum domain.
+ *
+ * Synchronization participant lifetime observations; Invalid is never recoverable.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_SYNC_OWNER_INVALID UINT64_C(0)
+/**
+ * `sync_owner_live` in the `sync_owner_state` enum domain.
+ *
+ * Synchronization participant lifetime observations; Invalid is never recoverable.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_SYNC_OWNER_LIVE UINT64_C(1)
+/**
+ * `sync_owner_dead` in the `sync_owner_state` enum domain.
+ *
+ * Synchronization participant lifetime observations; Invalid is never recoverable.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_SYNC_OWNER_DEAD UINT64_C(2)
+/** @} */
+
+/**
+ * @defgroup hyper_native_sync_wait_observation sync_wait_observation (enum)
+ * @ingroup hyper_native
+ * Successful wait observations do not acquire userspace mutex ownership.
+ * @{
+ */
+/**
+ * `sync_wait_recheck` in the `sync_wait_observation` enum domain.
+ *
+ * Successful wait observations do not acquire userspace mutex ownership.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_SYNC_WAIT_RECHECK UINT64_C(0)
+/**
+ * `sync_wait_owner_exited` in the `sync_wait_observation` enum domain.
+ *
+ * Successful wait observations do not acquire userspace mutex ownership.
+ * Select one value; this is not a bit mask.
+ */
+#define HYPER_NATIVE_SYNC_WAIT_OWNER_EXITED UINT64_C(1)
+/** @} */
+
+/**
+ * @defgroup hyper_native_sync_mutex sync_mutex (constants)
+ * @ingroup hyper_native
+ * Shared mutex control format used by the C and Rust substrate libraries.
+ * @{
+ */
+/**
+ * `sync_owner_token_max` in the `sync_mutex` constants domain.
+ *
+ * Shared mutex control format used by the C and Rust substrate libraries.
+ * Numeric parameter or sentinel, not an enum discriminant.
+ */
+#define HYPER_NATIVE_SYNC_OWNER_TOKEN_MAX UINT64_C(1152921504606846975)
+/**
+ * `sync_mutex_waiters` in the `sync_mutex` constants domain.
+ *
+ * Shared mutex control format used by the C and Rust substrate libraries.
+ * Numeric parameter or sentinel, not an enum discriminant.
+ */
+#define HYPER_NATIVE_SYNC_MUTEX_WAITERS UINT64_C(1152921504606846976)
+/**
+ * `sync_mutex_recovering` in the `sync_mutex` constants domain.
+ *
+ * Shared mutex control format used by the C and Rust substrate libraries.
+ * Numeric parameter or sentinel, not an enum discriminant.
+ */
+#define HYPER_NATIVE_SYNC_MUTEX_RECOVERING UINT64_C(2305843009213693952)
+/**
+ * `sync_mutex_not_recoverable` in the `sync_mutex` constants domain.
+ *
+ * Shared mutex control format used by the C and Rust substrate libraries.
+ * Numeric parameter or sentinel, not an enum discriminant.
+ */
+#define HYPER_NATIVE_SYNC_MUTEX_NOT_RECOVERABLE UINT64_C(4611686018427387904)
+/** @} */
 
 /**
  * @defgroup hyper_native_vdso vdso (constants)
@@ -4587,7 +4703,7 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
  * | Feature | `Core` |
  * | Arguments | `size: byte_count`, `options: u64` |
  * | Results | `vmo: handle` |
- * | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x7b` |
+ * | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x10000000007b` |
  * | User memory | — |
  * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
  * | Audit | `Object` |
@@ -8022,6 +8138,132 @@ static inline uint32_t hyper_native_object_transfer_class(uint32_t object_kind) 
 #define HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE UINT64_C(280)
 
 /**
+ * Object-local method `sync_domain_create`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=object_factory, rights=0x8000000000` |
+ * | Operation | 262 |
+ * | Feature | `Core` |
+ * | Arguments | `options: u64` |
+ * | Results | `domain: handle` |
+ * | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `domain: produce, kind=sync_domain, fixed=0xf0000000000b` |
+ * | User memory | — |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_SYNC_DOMAIN_CREATE UINT64_C(262)
+
+/**
+ * Object-local method `sync_domain_bind`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x100000000000` |
+ * | Operation | 256 |
+ * | Feature | `Core` |
+ * | Arguments | `request: user_address`, `request_size: byte_count` |
+ * | Results | — |
+ * | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x100000000000` |
+ * | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=sync_domain_binding, borrowed-fields=[vmo: kind=vmo, rights=0x100000000020, optional=false]; order=0` |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_SYNC_DOMAIN_BIND UINT64_C(256)
+
+/**
+ * Object-local method `sync_domain_join`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x200000000000` |
+ * | Operation | 257 |
+ * | Feature | `Core` |
+ * | Arguments | `options: u64` |
+ * | Results | `token: u64` |
+ * | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x200000000000` |
+ * | User memory | — |
+ * | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_SYNC_DOMAIN_JOIN UINT64_C(257)
+
+/**
+ * Object-local method `sync_domain_owner_query`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x8` |
+ * | Operation | 258 |
+ * | Feature | `Core` |
+ * | Arguments | `token: u64`, `options: u64` |
+ * | Results | `state: u64` |
+ * | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x8` |
+ * | User memory | — |
+ * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_SYNC_DOMAIN_OWNER_QUERY UINT64_C(258)
+
+/**
+ * Object-local method `sync_domain_wait_u64`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x400000000000` |
+ * | Operation | 259 |
+ * | Feature | `Core` |
+ * | Arguments | `request: user_address`, `request_size: byte_count` |
+ * | Results | `observation: u64`, `owner: u64` |
+ * | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x400000000000` |
+ * | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=sync_domain_wait, borrowed-fields=[vmo: kind=vmo, rights=0x30, optional=false; cancellation: kind=event, rights=0x4, optional=true]; order=0` |
+ * | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_SYNC_DOMAIN_WAIT_U64 UINT64_C(259)
+
+/**
+ * Object-local method `sync_domain_wake_u64`.
+ *
+ * | Property | Contract |
+ * | --- | --- |
+ * | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x800000000000` |
+ * | Operation | 260 |
+ * | Feature | `Core` |
+ * | Arguments | `vmo: handle`, `offset: u64`, `count: u32`, `options: u64` |
+ * | Results | `woken: u64` |
+ * | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x800000000000`, `vmo: Borrow, kind=vmo, rights=0x20` |
+ * | User memory | — |
+ * | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+ * | Audit | `Task` |
+ *
+ * Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+ *
+ * Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+ */
+#define HYPER_NATIVE_OP_SYNC_DOMAIN_WAKE_U64 UINT64_C(260)
+
+/**
  * Return the auxiliary-result registers defined on a failure status.
  * Bit N denotes auxiliary result N, excluding the separate signed status register.
  * Zero means no defined failure results (also returned for unknown methods and OK).
@@ -8057,6 +8299,109 @@ static inline uint64_t hyper_native_failure_result_mask(
     }
     return UINT64_C(0);
 }
+
+/**
+ * Minimum supported prefix of `sync_domain_binding`, in bytes; individual calls define their buffer lengths.
+ */
+#define HYPER_NATIVE_SYNC_DOMAIN_BINDING_MIN_SIZE UINT64_C(40)
+/**
+ * Wire layout for `sync_domain_binding`.
+ *
+ * Size: 40 bytes; alignment: 8 bytes; supported minimum prefix: 40 bytes.
+ * Scalar widths and member offsets are fixed across supported architectures.
+ * The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+ * the consuming operation defines its accepted length.
+ *
+ * Used by: `sync_domain_bind`.
+ */
+typedef struct hyper_native_sync_domain_binding_t {
+    /**
+     * Wire offset 0 bytes; width 8 bytes.
+     */
+    uint64_t options;
+    /**
+     * Wire offset 8 bytes; width 8 bytes.
+     */
+    uint64_t vmo;
+    /**
+     * Wire offset 16 bytes; width 8 bytes.
+     */
+    uint64_t offset;
+    /**
+     * Wire offset 24 bytes; width 8 bytes.
+     */
+    uint64_t length;
+    /**
+     * Wire offset 32 bytes; width 8 bytes.
+     */
+    uint64_t reserved;
+} hyper_native_sync_domain_binding_t;
+HYPER_ABI_STATIC_ASSERT(sizeof(hyper_native_sync_domain_binding_t) == 40, "sync_domain_binding size");
+HYPER_ABI_STATIC_ASSERT(HYPER_ABI_ALIGNOF(hyper_native_sync_domain_binding_t) == 8, "sync_domain_binding alignment");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_binding_t, options) == 0, "sync_domain_binding.options offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_binding_t, vmo) == 8, "sync_domain_binding.vmo offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_binding_t, offset) == 16, "sync_domain_binding.offset offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_binding_t, length) == 24, "sync_domain_binding.length offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_binding_t, reserved) == 32, "sync_domain_binding.reserved offset");
+
+/**
+ * Minimum supported prefix of `sync_domain_wait`, in bytes; individual calls define their buffer lengths.
+ */
+#define HYPER_NATIVE_SYNC_DOMAIN_WAIT_MIN_SIZE UINT64_C(64)
+/**
+ * Wire layout for `sync_domain_wait`.
+ *
+ * Size: 64 bytes; alignment: 8 bytes; supported minimum prefix: 64 bytes.
+ * Scalar widths and member offsets are fixed across supported architectures.
+ * The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+ * the consuming operation defines its accepted length.
+ *
+ * Used by: `sync_domain_wait_u64`.
+ */
+typedef struct hyper_native_sync_domain_wait_t {
+    /**
+     * Wire offset 0 bytes; width 8 bytes.
+     */
+    uint64_t options;
+    /**
+     * Wire offset 8 bytes; width 8 bytes.
+     */
+    uint64_t vmo;
+    /**
+     * Wire offset 16 bytes; width 8 bytes.
+     */
+    uint64_t offset;
+    /**
+     * Wire offset 24 bytes; width 8 bytes.
+     */
+    uint64_t expected;
+    /**
+     * Wire offset 32 bytes; width 8 bytes.
+     */
+    uint64_t owner;
+    /**
+     * Wire offset 40 bytes; width 8 bytes.
+     */
+    uint64_t deadline;
+    /**
+     * Wire offset 48 bytes; width 8 bytes.
+     */
+    uint64_t cancellation;
+    /**
+     * Wire offset 56 bytes; width 8 bytes.
+     */
+    uint64_t reserved;
+} hyper_native_sync_domain_wait_t;
+HYPER_ABI_STATIC_ASSERT(sizeof(hyper_native_sync_domain_wait_t) == 64, "sync_domain_wait size");
+HYPER_ABI_STATIC_ASSERT(HYPER_ABI_ALIGNOF(hyper_native_sync_domain_wait_t) == 8, "sync_domain_wait alignment");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, options) == 0, "sync_domain_wait.options offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, vmo) == 8, "sync_domain_wait.vmo offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, offset) == 16, "sync_domain_wait.offset offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, expected) == 24, "sync_domain_wait.expected offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, owner) == 32, "sync_domain_wait.owner offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, deadline) == 40, "sync_domain_wait.deadline offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, cancellation) == 48, "sync_domain_wait.cancellation offset");
+HYPER_ABI_STATIC_ASSERT(offsetof(hyper_native_sync_domain_wait_t, reserved) == 56, "sync_domain_wait.reserved offset");
 
 /**
  * Minimum supported prefix of `thread_create_request`, in bytes; individual calls define their buffer lengths.

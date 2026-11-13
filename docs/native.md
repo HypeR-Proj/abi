@@ -91,6 +91,7 @@ ABI revision: `0`.
 | 42 | `object_factory` | `forbidden` |
 | 43 | `system_info` | `general` |
 | 44 | `block_queue` | `rendezvous_only` |
+| 45 | `sync_domain` | `general` |
 
 ## Object signals
 
@@ -134,6 +135,36 @@ ABI revision: `0`.
 Enum domains contain mutually exclusive values; flags contain independent bits.
 Constants contain bounds, sizes, addresses and sentinels. All are exported as
 fixed-width integer constants; grouping does not change wire field types.
+
+### `sync_owner_state` (enum)
+
+Synchronization participant lifetime observations; Invalid is never recoverable.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `sync_owner_invalid` | `0` |  |
+| `sync_owner_live` | `1` |  |
+| `sync_owner_dead` | `2` |  |
+
+### `sync_wait_observation` (enum)
+
+Successful wait observations do not acquire userspace mutex ownership.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `sync_wait_recheck` | `0` |  |
+| `sync_wait_owner_exited` | `1` |  |
+
+### `sync_mutex` (constants)
+
+Shared mutex control format used by the C and Rust substrate libraries.
+
+| Name | Value | Meaning |
+| --- | ---: | --- |
+| `sync_owner_token_max` | `1152921504606846975` |  |
+| `sync_mutex_waiters` | `1152921504606846976` |  |
+| `sync_mutex_recovering` | `2305843009213693952` |  |
+| `sync_mutex_not_recoverable` | `4611686018427387904` |  |
 
 ### `vdso` (constants)
 
@@ -913,6 +944,10 @@ RISC-V ISA extensions accepted in guest configuration.
 
 ## Semantic rules
 
+- sync_domain_create creates an independently charged synchronization domain. SyncDomain has no object-level signal source: its word operations require SYNC_WAIT and SYNC_WAKE, not generic WAIT or SIGNAL. bind copies sync_domain_binding once, requires domain and VMO SYNC_CONFIGURE plus VMO WRITE, and binds a nonempty eight-byte-aligned ordinary writable RAM range. Canonical backing-relative overlapping bindings must name the same domain; conflicting domains are rejected. Closing handles does not unbind storage or reset lock words. Domain identity is fixed for the backing lifetime. Aliases normalize to the same backing and absolute offset. Shared u32 waits retain their separate namespace.
+- sync_domain_join registers only the invoking Thread, is idempotent within that domain, and returns a nonzero token at most SYNC_OWNER_TOKEN_MAX. Successfully issued tokens never repeat. A failed join issues no token. Closing handles or abandoning the local participant view does not declare a live Thread dead. owner_query returns INVALID for zero or never-issued tokens, LIVE for active participants, and DEAD only after actual terminal detach, never merely a stop request. DEAD observation has Acquire visibility of the owner's completed writes before its final stop. It does not establish consistency of partially completed application updates and grants no Thread control authority.
+- sync_domain_wait_u64 requires domain SYNC_WAIT and copies sync_domain_wait once. The VMO needs READ|WRITE and the selected eight-byte-aligned word must belong to this domain's bound range. cancellation is zero or an Event with WAIT; its SIGNALED level cancels this wait. The full u64 comparison, owner lifetime observation and wait registration close wake/exit/cancellation admission races. Mismatch returns RECHECK; a matching word with the observed owner confirmed dead returns OWNER_EXITED and that token. Other notifications return RECHECK and owner zero. After capability and binding validation, invalid owner tokens fail INVALID_ARGUMENT even on a word mismatch. For valid tokens, an immediate mismatch or already-observed owner death is returned before timer/event enrollment; after enrollment the sources arbitrate one winner. A result never acquires a mutex. Deadline is absolute monotonic nanoseconds; UINT64_MAX is infinite. Cancellation returns CANCELLED, timeout TIMED_OUT. Closing handles or unmapping after admission does not release the retained backing before registration cleanup. One completion arbitrates word wake, domain death, cancellation and timer. Every actual joined Thread exit notifies eligible domain waiters because their remembered owner can be obsolete after wake-one handoff. Kernel does not parse held-lock lists, application owner bits or payload.
+- sync_domain_wake_u64 requires domain SYNC_WAKE and VMO WRITE, validates binding and returns the actual count notified up to the u32 count. Zero count is a validated no-op; UINT32_MAX permits waking all. It never modifies the word. Shared mutex release uses Release store before wake; recovery must query/observe DEAD then CAS the exact full word, with Acquire ownership. SYNC_MUTEX_WAITERS is a notification obligation, not a waiter count. Kernel observations remain distinct from SDK OwnerDied acquisition. The SDK preserves wake-one relay when a selected waiter cancels, times out or fails, while thread death supplies domain notification. Uncontended mutex operations require no syscall after join and binding. All options, reserved fields, unknown record tails and unused argument registers are zero.
 - executable_publish requires ExecutableAuthority CREATE_EXECUTABLE and source VMO READ. Options and unused argument registers must be zero. Only an ordinary writable RAM VMO is accepted: snapshots, executable and observation sources are rejected. The operation coherently copies the entire source into physically distinct immutable backing; active writable mappings, shared atomic waits or exclusive hardware ownership report BUSY. Success returns a new VMO and its byte size, with READ|MAP|EXECUTE|INSPECT|DUPLICATE|TRANSFER rights and never WRITE. Source handles and contents remain owned by the caller and can be modified after publication without changing the executable result. Destination backing and publication metadata are charged to the calling process, not the source sponsor. Architecture instruction-cache publication completes before exposing the handle. No writable alias is created for executable backing; mapping or protecting it writable, or mapping ordinary writable VMOs executable, remains forbidden. Publication does not validate machine instructions, ABI correctness or control flow. The kernel initially delegates executable authority only to init; userspace explicitly routes attenuated authority to selected components, with no ambient ObjectFactory mint or default application grant.
 - vmo_wait_u32 and vmo_wake_u32 use explicit shared identity (VMO object, byte offset), independent of process addresses or mapping lineage. Wait requires READ|WRITE, wake requires WRITE, and neither requires MAP. Offset is four-byte aligned with offset+4 inside an ordinary writable RAM VMO; immutable snapshots, executable and observation VMOs are rejected. Options and unused argument registers must be zero. Expected and count are u32 values without high bits. Wait compares the aligned atomic u32 and registers under the same wait-key lock: mismatch returns OK without sleeping. Deadline is absolute monotonic nanoseconds; timeout or thread cancellation releases the registration. An OK wait is only a wake hint and requires rechecking the shared condition. Wake returns the actual number notified up to count; zero count is a validated no-op, not a broadcast. Closing handles or unmapping does not cancel an admitted shared wait. Its retained object identity, page pin and writable admission survive until unlink; snapshots, ordinary VMO byte access and exclusive hardware admission for the entire VMO remain BUSY while that admission lives. A wait encountering existing hardware-exclusive ownership returns BUSY. Wake does not load, populate or lease backing and may return zero while hardware owns the VMO. All concurrently accessed aliases of an active shared word must use aligned same-width atomic u32 operations, with application-defined release/acquire ordering; non-atomic or overlapping mixed-width access is invalid. Wait-control and pin charges belong to the waiter; first materialization of sparse backing remains charged to the VMO owner. Private address-based atomic_wait/atomic_wake retain their existing independent identity and cannot wake these shared registrations.
 - loader_startup optionally supplies vdso_image and vdso_data VMO handles as a pair; both zero means unavailable. The loader maps the matching ELF image read/execute and its observation segment read-only/non-executable, closes these handles after mapping, and supplies the image base as auxv VDSO_AUXV_BASE (33). The image describes its code/data placement through PT_LOAD segments; applications must not depend on private data offsets. Live observation backing refuses writable/executable mappings, writes, snapshots and private COW views. Mapping lifetime is independent of SystemInfo and the startup VMO handles: closing them does not revoke public clock or capture-activity observations.
@@ -1953,7 +1988,7 @@ Object-local method `vmo_create`.
 | Feature | `Core` |
 | Arguments | `size: byte_count`, `options: u64` |
 | Results | `vmo: handle` |
-| Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x7b` |
+| Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x10000000007b` |
 | User memory | — |
 | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 | Audit | `Object` |
@@ -5222,7 +5257,154 @@ Arguments and auxiliary results follow the listed register order; neither list i
 
 Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 
+### `sync_domain_create`
+
+Object-local method `sync_domain_create`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `receiver: Borrow, kind=object_factory, rights=0x8000000000` |
+| Operation | 262 |
+| Feature | `Core` |
+| Arguments | `options: u64` |
+| Results | `domain: handle` |
+| Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `domain: produce, kind=sync_domain, fixed=0xf0000000000b` |
+| User memory | — |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Task` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `sync_domain_bind`
+
+Object-local method `sync_domain_bind`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `receiver: Borrow, kind=sync_domain, rights=0x100000000000` |
+| Operation | 256 |
+| Feature | `Core` |
+| Arguments | `request: user_address`, `request_size: byte_count` |
+| Results | — |
+| Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x100000000000` |
+| User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=sync_domain_binding, borrowed-fields=[vmo: kind=vmo, rights=0x100000000020, optional=false]; order=0` |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Task` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `sync_domain_join`
+
+Object-local method `sync_domain_join`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `receiver: Borrow, kind=sync_domain, rights=0x200000000000` |
+| Operation | 257 |
+| Feature | `Core` |
+| Arguments | `options: u64` |
+| Results | `token: u64` |
+| Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x200000000000` |
+| User memory | — |
+| Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Task` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `sync_domain_owner_query`
+
+Object-local method `sync_domain_owner_query`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `receiver: Borrow, kind=sync_domain, rights=0x8` |
+| Operation | 258 |
+| Feature | `Core` |
+| Arguments | `token: u64`, `options: u64` |
+| Results | `state: u64` |
+| Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x8` |
+| User memory | — |
+| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Task` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `sync_domain_wait_u64`
+
+Object-local method `sync_domain_wait_u64`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `receiver: Borrow, kind=sync_domain, rights=0x400000000000` |
+| Operation | 259 |
+| Feature | `Core` |
+| Arguments | `request: user_address`, `request_size: byte_count` |
+| Results | `observation: u64`, `owner: u64` |
+| Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x400000000000` |
+| User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=sync_domain_wait, borrowed-fields=[vmo: kind=vmo, rights=0x30, optional=false; cancellation: kind=event, rights=0x4, optional=true]; order=0` |
+| Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Task` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
+### `sync_domain_wake_u64`
+
+Object-local method `sync_domain_wake_u64`.
+
+| Property | Contract |
+| --- | --- |
+| Receiver | `receiver: Borrow, kind=sync_domain, rights=0x800000000000` |
+| Operation | 260 |
+| Feature | `Core` |
+| Arguments | `vmo: handle`, `offset: u64`, `count: u32`, `options: u64` |
+| Results | `woken: u64` |
+| Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x800000000000`, `vmo: Borrow, kind=vmo, rights=0x20` |
+| User memory | — |
+| Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+| Audit | `Task` |
+
+Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+
+Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+
 ## Public records
+
+### `sync_domain_binding`
+
+Minimum prefix: 40 bytes; size: 40 bytes; alignment: 8 bytes.
+
+| Offset | Field | Type |
+| ---: | --- | --- |
+| 0 | `options` | `u64` |
+| 8 | `vmo` | `u64` |
+| 16 | `offset` | `u64` |
+| 24 | `length` | `u64` |
+| 32 | `reserved` | `u64` |
+
+### `sync_domain_wait`
+
+Minimum prefix: 64 bytes; size: 64 bytes; alignment: 8 bytes.
+
+| Offset | Field | Type |
+| ---: | --- | --- |
+| 0 | `options` | `u64` |
+| 8 | `vmo` | `u64` |
+| 16 | `offset` | `u64` |
+| 24 | `expected` | `u64` |
+| 32 | `owner` | `u64` |
+| 40 | `deadline` | `u64` |
+| 48 | `cancellation` | `u64` |
+| 56 | `reserved` | `u64` |
 
 ### `thread_create_request`
 

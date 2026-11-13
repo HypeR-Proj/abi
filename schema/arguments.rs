@@ -2561,3 +2561,16 @@ pub(super) const fn input_record(record: &'static str) -> Argument {
         }),
     }
 }
+
+/// One copied request retains independently attenuated borrowed capabilities.
+pub(super) const fn sync_input_record(
+    record: &'static str,
+    fields: &'static [BorrowedHandleField],
+) -> Argument {
+    let mut argument = input_record(record);
+    if let Some(mut memory) = argument.memory {
+        memory.handles = Some(IndirectHandles::BorrowFields { fields });
+        argument.memory = Some(memory);
+    }
+    argument
+}

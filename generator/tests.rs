@@ -60,6 +60,10 @@ fn generated_bit_constants_preserve_schema_bit_positions() {
         ("SCHED_PRIORITY", 41),
         ("SCHED_CLASS", 42),
         ("SCHED_BUDGET", 43),
+        ("SYNC_CONFIGURE", 44),
+        ("SYNC_JOIN", 45),
+        ("SYNC_WAIT", 46),
+        ("SYNC_WAKE", 47),
     ] {
         assert!(
             generated
@@ -75,7 +79,7 @@ fn generated_bit_constants_preserve_schema_bit_positions() {
     assert!(
         generated
             .rust
-            .contains("HYPER_NATIVE_RIGHTS_MASK: u64 = 0xfffffffffff;")
+            .contains("HYPER_NATIVE_RIGHTS_MASK: u64 = 0xffffffffffff;")
     );
     assert!(
         generated
@@ -90,7 +94,7 @@ fn generated_bit_constants_preserve_schema_bit_positions() {
     assert!(
         generated
             .c
-            .contains("HYPER_NATIVE_RIGHTS_MASK UINT64_C(0xfffffffffff)")
+            .contains("HYPER_NATIVE_RIGHTS_MASK UINT64_C(0xffffffffffff)")
     );
 }
 
@@ -984,6 +988,7 @@ fn object_transfer_classes_match_the_audited_contract() {
         ("object_factory", TransferClass::Forbidden),
         ("system_info", TransferClass::General),
         ("block_queue", TransferClass::RendezvousOnly),
+        ("sync_domain", TransferClass::General),
     ];
     assert_eq!(schema::OBJECT_KINDS.len(), expected.len());
     for (kind, expected) in schema::OBJECT_KINDS.iter().zip(expected) {
@@ -1612,5 +1617,70 @@ fn suspension_validation_rejects_nonblocking_user_copy() -> Result<(), String> {
         ..schema::NATIVE_ABI
     };
     assert!(validate(&candidate).is_err());
+    Ok(())
+}
+
+#[test]
+fn sync_domain_records_preserve_independent_authority() -> Result<(), String> {
+    let wait = schema::INVOCATIONS
+        .iter()
+        .find(|call| call.name == "sync_domain_wait_u64")
+        .ok_or("missing wait")?;
+
+    assert_eq!(
+        wait.receiver
+            .handle
+            .ok_or("missing wait receiver")?
+            .required_rights,
+        schema::RIGHT_SYNC_WAIT
+    );
+    let wake = schema::INVOCATIONS
+        .iter()
+        .find(|call| call.name == "sync_domain_wake_u64")
+        .ok_or("missing wake")?;
+    assert_eq!(
+        wake.receiver
+            .handle
+            .ok_or("missing wake receiver")?
+            .required_rights,
+        schema::RIGHT_SYNC_WAKE
+    );
+    assert_eq!(
+        schema::SYNC_DOMAIN_RIGHTS & (schema::RIGHT_WAIT | schema::RIGHT_SIGNAL),
+        0
+    );
+    assert_eq!(
+        schema::SYNC_DOMAIN_RIGHTS & (schema::RIGHT_SYNC_WAIT | schema::RIGHT_SYNC_WAKE),
+        schema::RIGHT_SYNC_WAIT | schema::RIGHT_SYNC_WAKE
+    );
+    assert_eq!(wait.cancellation, schema::CancellationClass::Explicit);
+    let memory = wait
+        .arguments
+        .first()
+        .and_then(|arg| arg.memory)
+        .ok_or("missing record")?;
+    let Some(IndirectHandles::BorrowFields { fields }) = memory.handles else {
+        return Err("missing distinct capability fields".into());
+    };
+    assert_eq!(fields.len(), 2);
+    assert_eq!(fields[0].name, "vmo");
+    assert_eq!(fields[0].object, "vmo");
+    assert_eq!(
+        fields[0].required_rights,
+        schema::RIGHT_READ | schema::RIGHT_WRITE
+    );
+    assert!(!fields[0].optional);
+    assert_eq!(fields[1].name, "cancellation");
+    assert_eq!(fields[1].object, "event");
+    assert_eq!(fields[1].required_rights, schema::RIGHT_WAIT);
+    assert!(fields[1].optional);
+    assert_eq!(
+        schema::VMO_WRITABLE_RIGHTS & schema::RIGHT_SYNC_CONFIGURE,
+        schema::RIGHT_SYNC_CONFIGURE
+    );
+    assert_eq!(
+        schema::VMO_EXECUTABLE_RIGHTS & schema::RIGHT_SYNC_CONFIGURE,
+        0
+    );
     Ok(())
 }

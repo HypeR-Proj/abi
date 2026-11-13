@@ -164,6 +164,8 @@ pub const HYPER_NATIVE_OBJECT_OBJECT_FACTORY: u32 = 42;
 pub const HYPER_NATIVE_OBJECT_SYSTEM_INFO: u32 = 43;
 /// Object-kind tag `block_queue` used with an object-local operation number.
 pub const HYPER_NATIVE_OBJECT_BLOCK_QUEUE: u32 = 44;
+/// Object-kind tag `sync_domain` used with an object-local operation number.
+pub const HYPER_NATIVE_OBJECT_SYNC_DOMAIN: u32 = 45;
 
 /// Handle transport is forbidden for this object kind.
 pub const HYPER_NATIVE_TRANSFER_CLASS_FORBIDDEN: u32 = 0;
@@ -225,6 +227,7 @@ pub const fn hyper_native_object_transfer_class(object_kind: u32) -> u32 {
         HYPER_NATIVE_OBJECT_OBJECT_FACTORY => HYPER_NATIVE_TRANSFER_CLASS_FORBIDDEN,
         HYPER_NATIVE_OBJECT_SYSTEM_INFO => HYPER_NATIVE_TRANSFER_CLASS_GENERAL,
         HYPER_NATIVE_OBJECT_BLOCK_QUEUE => HYPER_NATIVE_TRANSFER_CLASS_RENDEZVOUS_ONLY,
+        HYPER_NATIVE_OBJECT_SYNC_DOMAIN => HYPER_NATIVE_TRANSFER_CLASS_GENERAL,
         _ => HYPER_NATIVE_TRANSFER_CLASS_FORBIDDEN,
     }
 }
@@ -317,9 +320,17 @@ pub const HYPER_NATIVE_RIGHT_SCHED_PRIORITY: u64 = 1_u64 << 41;
 pub const HYPER_NATIVE_RIGHT_SCHED_CLASS: u64 = 1_u64 << 42;
 /// Capability right; the receiving object's method determines the required rights: `sched_budget`.
 pub const HYPER_NATIVE_RIGHT_SCHED_BUDGET: u64 = 1_u64 << 43;
+/// Capability right; the receiving object's method determines the required rights: `sync_configure`.
+pub const HYPER_NATIVE_RIGHT_SYNC_CONFIGURE: u64 = 1_u64 << 44;
+/// Capability right; the receiving object's method determines the required rights: `sync_join`.
+pub const HYPER_NATIVE_RIGHT_SYNC_JOIN: u64 = 1_u64 << 45;
+/// Capability right; the receiving object's method determines the required rights: `sync_wait`.
+pub const HYPER_NATIVE_RIGHT_SYNC_WAIT: u64 = 1_u64 << 46;
+/// Capability right; the receiving object's method determines the required rights: `sync_wake`.
+pub const HYPER_NATIVE_RIGHT_SYNC_WAKE: u64 = 1_u64 << 47;
 
 /// All declared right bits; this mask does not grant authority to a handle.
-pub const HYPER_NATIVE_RIGHTS_MASK: u64 = 0xfffffffffff;
+pub const HYPER_NATIVE_RIGHTS_MASK: u64 = 0xffffffffffff;
 
 /// Wait signal `ready` for `process_retirement` objects; bit positions are object-local.
 pub const HYPER_NATIVE_SIGNAL_PROCESS_RETIREMENT_READY: u64 = 1_u64 << 0;
@@ -385,6 +396,54 @@ pub const HYPER_NATIVE_SIGNAL_BLOCK_QUEUE_COMPLETED: u64 = 1_u64 << 0;
 pub const HYPER_NATIVE_SIGNAL_BLOCK_QUEUE_WRITABLE: u64 = 1_u64 << 1;
 /// Wait signal `peer_closed` for `block_queue` objects; bit positions are object-local.
 pub const HYPER_NATIVE_SIGNAL_BLOCK_QUEUE_PEER_CLOSED: u64 = 1_u64 << 2;
+
+/// `sync_owner_invalid` in the `sync_owner_state` enum domain.
+///
+/// Synchronization participant lifetime observations; Invalid is never recoverable.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_SYNC_OWNER_INVALID: u64 = 0;
+/// `sync_owner_live` in the `sync_owner_state` enum domain.
+///
+/// Synchronization participant lifetime observations; Invalid is never recoverable.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_SYNC_OWNER_LIVE: u64 = 1;
+/// `sync_owner_dead` in the `sync_owner_state` enum domain.
+///
+/// Synchronization participant lifetime observations; Invalid is never recoverable.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_SYNC_OWNER_DEAD: u64 = 2;
+
+/// `sync_wait_recheck` in the `sync_wait_observation` enum domain.
+///
+/// Successful wait observations do not acquire userspace mutex ownership.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_SYNC_WAIT_RECHECK: u64 = 0;
+/// `sync_wait_owner_exited` in the `sync_wait_observation` enum domain.
+///
+/// Successful wait observations do not acquire userspace mutex ownership.
+/// Select one value; this is not a bit mask.
+pub const HYPER_NATIVE_SYNC_WAIT_OWNER_EXITED: u64 = 1;
+
+/// `sync_owner_token_max` in the `sync_mutex` constants domain.
+///
+/// Shared mutex control format used by the C and Rust substrate libraries.
+/// Numeric parameter or sentinel, not an enum discriminant.
+pub const HYPER_NATIVE_SYNC_OWNER_TOKEN_MAX: u64 = 1152921504606846975;
+/// `sync_mutex_waiters` in the `sync_mutex` constants domain.
+///
+/// Shared mutex control format used by the C and Rust substrate libraries.
+/// Numeric parameter or sentinel, not an enum discriminant.
+pub const HYPER_NATIVE_SYNC_MUTEX_WAITERS: u64 = 1152921504606846976;
+/// `sync_mutex_recovering` in the `sync_mutex` constants domain.
+///
+/// Shared mutex control format used by the C and Rust substrate libraries.
+/// Numeric parameter or sentinel, not an enum discriminant.
+pub const HYPER_NATIVE_SYNC_MUTEX_RECOVERING: u64 = 2305843009213693952;
+/// `sync_mutex_not_recoverable` in the `sync_mutex` constants domain.
+///
+/// Shared mutex control format used by the C and Rust substrate libraries.
+/// Numeric parameter or sentinel, not an enum discriminant.
+pub const HYPER_NATIVE_SYNC_MUTEX_NOT_RECOVERABLE: u64 = 4611686018427387904;
 
 /// `vdso_auxv_base` in the `vdso` constants domain.
 ///
@@ -2855,7 +2914,7 @@ pub const HYPER_NATIVE_OP_DIRECTORY_OPEN_DIRECTORY: u64 = 257;
 /// | Feature | `Core` |
 /// | Arguments | `size: byte_count`, `options: u64` |
 /// | Results | `vmo: handle` |
-/// | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x7b` |
+/// | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `vmo: produce, kind=vmo, fixed=0x10000000007b` |
 /// | User memory | — |
 /// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
 /// | Audit | `Object` |
@@ -5962,6 +6021,120 @@ pub const HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED: u64 = 280;
 /// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
 pub const HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE: u64 = 280;
 
+/// Object-local method `sync_domain_create`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=object_factory, rights=0x8000000000` |
+/// | Operation | 262 |
+/// | Feature | `Core` |
+/// | Arguments | `options: u64` |
+/// | Results | `domain: handle` |
+/// | Capability effects | `receiver: Borrow, kind=object_factory, rights=0x8000000000`, `domain: produce, kind=sync_domain, fixed=0xf0000000000b` |
+/// | User memory | — |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_SYNC_DOMAIN_CREATE: u64 = 262;
+
+/// Object-local method `sync_domain_bind`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x100000000000` |
+/// | Operation | 256 |
+/// | Feature | `Core` |
+/// | Arguments | `request: user_address`, `request_size: byte_count` |
+/// | Results | — |
+/// | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x100000000000` |
+/// | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=sync_domain_binding, borrowed-fields=[vmo: kind=vmo, rights=0x100000000020, optional=false]; order=0` |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_SYNC_DOMAIN_BIND: u64 = 256;
+
+/// Object-local method `sync_domain_join`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x200000000000` |
+/// | Operation | 257 |
+/// | Feature | `Core` |
+/// | Arguments | `options: u64` |
+/// | Results | `token: u64` |
+/// | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x200000000000` |
+/// | User memory | — |
+/// | Execution | `blocking=MayBlock, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_SYNC_DOMAIN_JOIN: u64 = 257;
+
+/// Object-local method `sync_domain_owner_query`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x8` |
+/// | Operation | 258 |
+/// | Feature | `Core` |
+/// | Arguments | `token: u64`, `options: u64` |
+/// | Results | `state: u64` |
+/// | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x8` |
+/// | User memory | — |
+/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_SYNC_DOMAIN_OWNER_QUERY: u64 = 258;
+
+/// Object-local method `sync_domain_wait_u64`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x400000000000` |
+/// | Operation | 259 |
+/// | Feature | `Core` |
+/// | Arguments | `request: user_address`, `request_size: byte_count` |
+/// | Results | `observation: u64`, `owner: u64` |
+/// | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x400000000000` |
+/// | User memory | `request: Read, len=request_size bytes, max-bytes=4096, record=sync_domain_wait, borrowed-fields=[vmo: kind=vmo, rights=0x30, optional=false; cancellation: kind=event, rights=0x4, optional=true]; order=0` |
+/// | Execution | `blocking=MayBlock, cancellation=Explicit, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_SYNC_DOMAIN_WAIT_U64: u64 = 259;
+
+/// Object-local method `sync_domain_wake_u64`.
+///
+/// | Property | Contract |
+/// | --- | --- |
+/// | Receiver | `receiver: Borrow, kind=sync_domain, rights=0x800000000000` |
+/// | Operation | 260 |
+/// | Feature | `Core` |
+/// | Arguments | `vmo: handle`, `offset: u64`, `count: u32`, `options: u64` |
+/// | Results | `woken: u64` |
+/// | Capability effects | `receiver: Borrow, kind=sync_domain, rights=0x800000000000`, `vmo: Borrow, kind=vmo, rights=0x20` |
+/// | User memory | — |
+/// | Execution | `blocking=Never, cancellation=None, restart=Never, completion=Returns, flags=Strict` |
+/// | Audit | `Task` |
+///
+/// Arguments and auxiliary results follow the listed register order; neither list includes the receiver or signed status.
+///
+/// Auxiliary results are valid only on `ok`, except for the explicitly listed failure statuses.
+pub const HYPER_NATIVE_OP_SYNC_DOMAIN_WAKE_U64: u64 = 260;
+
 /// A decoded object method; enum discriminants are not a machine ABI.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NativeOperation {
@@ -6383,6 +6556,18 @@ pub enum NativeOperation {
     FilesystemDetachFailed,
     /// Decoded method; see [`HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE`] for its contract.
     NativeBlockRetireQueue,
+    /// Decoded method; see [`HYPER_NATIVE_OP_SYNC_DOMAIN_CREATE`] for its contract.
+    SyncDomainCreate,
+    /// Decoded method; see [`HYPER_NATIVE_OP_SYNC_DOMAIN_BIND`] for its contract.
+    SyncDomainBind,
+    /// Decoded method; see [`HYPER_NATIVE_OP_SYNC_DOMAIN_JOIN`] for its contract.
+    SyncDomainJoin,
+    /// Decoded method; see [`HYPER_NATIVE_OP_SYNC_DOMAIN_OWNER_QUERY`] for its contract.
+    SyncDomainOwnerQuery,
+    /// Decoded method; see [`HYPER_NATIVE_OP_SYNC_DOMAIN_WAIT_U64`] for its contract.
+    SyncDomainWaitU64,
+    /// Decoded method; see [`HYPER_NATIVE_OP_SYNC_DOMAIN_WAKE_U64`] for its contract.
+    SyncDomainWakeU64,
 }
 
 #[rustfmt::skip]
@@ -6435,6 +6620,7 @@ impl NativeOperation {
             HYPER_NATIVE_OBJECT_OBJECT_FACTORY => {},
             HYPER_NATIVE_OBJECT_SYSTEM_INFO => {},
             HYPER_NATIVE_OBJECT_BLOCK_QUEUE => {},
+            HYPER_NATIVE_OBJECT_SYNC_DOMAIN => {},
             _ => return None,
         }
         match (object_kind, operation) {
@@ -6647,6 +6833,12 @@ impl NativeOperation {
             (HYPER_NATIVE_OBJECT_BLOCK_QUEUE, HYPER_NATIVE_OP_BLOCK_QUEUE_SUBMIT_WINDOW) => Some(Self::BlockQueueSubmitWindow),
             (HYPER_NATIVE_OBJECT_DIRECTORY, HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED) => Some(Self::FilesystemDetachFailed),
             (HYPER_NATIVE_OBJECT_NATIVE_BLOCK, HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE) => Some(Self::NativeBlockRetireQueue),
+            (HYPER_NATIVE_OBJECT_OBJECT_FACTORY, HYPER_NATIVE_OP_SYNC_DOMAIN_CREATE) => Some(Self::SyncDomainCreate),
+            (HYPER_NATIVE_OBJECT_SYNC_DOMAIN, HYPER_NATIVE_OP_SYNC_DOMAIN_BIND) => Some(Self::SyncDomainBind),
+            (HYPER_NATIVE_OBJECT_SYNC_DOMAIN, HYPER_NATIVE_OP_SYNC_DOMAIN_JOIN) => Some(Self::SyncDomainJoin),
+            (HYPER_NATIVE_OBJECT_SYNC_DOMAIN, HYPER_NATIVE_OP_SYNC_DOMAIN_OWNER_QUERY) => Some(Self::SyncDomainOwnerQuery),
+            (HYPER_NATIVE_OBJECT_SYNC_DOMAIN, HYPER_NATIVE_OP_SYNC_DOMAIN_WAIT_U64) => Some(Self::SyncDomainWaitU64),
+            (HYPER_NATIVE_OBJECT_SYNC_DOMAIN, HYPER_NATIVE_OP_SYNC_DOMAIN_WAKE_U64) => Some(Self::SyncDomainWakeU64),
             _ => None,
         }
     }
@@ -6863,6 +7055,12 @@ impl NativeOperation {
             Self::BlockQueueSubmitWindow => HYPER_NATIVE_OP_BLOCK_QUEUE_SUBMIT_WINDOW,
             Self::FilesystemDetachFailed => HYPER_NATIVE_OP_FILESYSTEM_DETACH_FAILED,
             Self::NativeBlockRetireQueue => HYPER_NATIVE_OP_NATIVE_BLOCK_RETIRE_QUEUE,
+            Self::SyncDomainCreate => HYPER_NATIVE_OP_SYNC_DOMAIN_CREATE,
+            Self::SyncDomainBind => HYPER_NATIVE_OP_SYNC_DOMAIN_BIND,
+            Self::SyncDomainJoin => HYPER_NATIVE_OP_SYNC_DOMAIN_JOIN,
+            Self::SyncDomainOwnerQuery => HYPER_NATIVE_OP_SYNC_DOMAIN_OWNER_QUERY,
+            Self::SyncDomainWaitU64 => HYPER_NATIVE_OP_SYNC_DOMAIN_WAIT_U64,
+            Self::SyncDomainWakeU64 => HYPER_NATIVE_OP_SYNC_DOMAIN_WAKE_U64,
         }
     }
 
@@ -7078,6 +7276,12 @@ impl NativeOperation {
             Self::BlockQueueSubmitWindow => Some(HYPER_NATIVE_OBJECT_BLOCK_QUEUE),
             Self::FilesystemDetachFailed => Some(HYPER_NATIVE_OBJECT_DIRECTORY),
             Self::NativeBlockRetireQueue => Some(HYPER_NATIVE_OBJECT_NATIVE_BLOCK),
+            Self::SyncDomainCreate => Some(HYPER_NATIVE_OBJECT_OBJECT_FACTORY),
+            Self::SyncDomainBind => Some(HYPER_NATIVE_OBJECT_SYNC_DOMAIN),
+            Self::SyncDomainJoin => Some(HYPER_NATIVE_OBJECT_SYNC_DOMAIN),
+            Self::SyncDomainOwnerQuery => Some(HYPER_NATIVE_OBJECT_SYNC_DOMAIN),
+            Self::SyncDomainWaitU64 => Some(HYPER_NATIVE_OBJECT_SYNC_DOMAIN),
+            Self::SyncDomainWakeU64 => Some(HYPER_NATIVE_OBJECT_SYNC_DOMAIN),
         }
     }
 
@@ -7293,6 +7497,12 @@ impl NativeOperation {
             Self::BlockQueueSubmitWindow => 4,
             Self::FilesystemDetachFailed => 1,
             Self::NativeBlockRetireQueue => 2,
+            Self::SyncDomainCreate => 1,
+            Self::SyncDomainBind => 2,
+            Self::SyncDomainJoin => 1,
+            Self::SyncDomainOwnerQuery => 2,
+            Self::SyncDomainWaitU64 => 2,
+            Self::SyncDomainWakeU64 => 4,
         }
     }
 
@@ -7508,6 +7718,12 @@ impl NativeOperation {
             Self::BlockQueueSubmitWindow => 32,
             Self::FilesystemDetachFailed => 17179869184,
             Self::NativeBlockRetireQueue => 32,
+            Self::SyncDomainCreate => 549755813888,
+            Self::SyncDomainBind => 17592186044416,
+            Self::SyncDomainJoin => 35184372088832,
+            Self::SyncDomainOwnerQuery => 8,
+            Self::SyncDomainWaitU64 => 70368744177664,
+            Self::SyncDomainWakeU64 => 140737488355328,
         }
     }
 
@@ -7541,6 +7757,79 @@ pub const fn hyper_native_failure_result_mask(
         None => 0,
     }
 }
+
+/// Minimum supported prefix of `sync_domain_binding`, in bytes; individual calls define their buffer lengths.
+pub const HYPER_NATIVE_SYNC_DOMAIN_BINDING_MIN_SIZE: usize = 40;
+/// Wire layout for `sync_domain_binding`.
+///
+/// Size: 40 bytes; alignment: 8 bytes; supported minimum prefix: 40 bytes.
+/// Scalar widths and member offsets are fixed across supported architectures.
+/// The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+/// the consuming operation defines its accepted length.
+///
+/// Used by: `sync_domain_bind`.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HyperNativeSyncDomainBinding {
+    /// Wire offset 0 bytes; width 8 bytes.
+    pub options: u64,
+    /// Wire offset 8 bytes; width 8 bytes.
+    pub vmo: u64,
+    /// Wire offset 16 bytes; width 8 bytes.
+    pub offset: u64,
+    /// Wire offset 24 bytes; width 8 bytes.
+    pub length: u64,
+    /// Wire offset 32 bytes; width 8 bytes.
+    pub reserved: u64,
+}
+const _: () = assert!(core::mem::size_of::<HyperNativeSyncDomainBinding>() == 40);
+const _: () = assert!(core::mem::align_of::<HyperNativeSyncDomainBinding>() == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainBinding, options) == 0);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainBinding, vmo) == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainBinding, offset) == 16);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainBinding, length) == 24);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainBinding, reserved) == 32);
+
+/// Minimum supported prefix of `sync_domain_wait`, in bytes; individual calls define their buffer lengths.
+pub const HYPER_NATIVE_SYNC_DOMAIN_WAIT_MIN_SIZE: usize = 64;
+/// Wire layout for `sync_domain_wait`.
+///
+/// Size: 64 bytes; alignment: 8 bytes; supported minimum prefix: 64 bytes.
+/// Scalar widths and member offsets are fixed across supported architectures.
+/// The minimum prefix describes extensibility, not permission to truncate every call's buffer;
+/// the consuming operation defines its accepted length.
+///
+/// Used by: `sync_domain_wait_u64`.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HyperNativeSyncDomainWait {
+    /// Wire offset 0 bytes; width 8 bytes.
+    pub options: u64,
+    /// Wire offset 8 bytes; width 8 bytes.
+    pub vmo: u64,
+    /// Wire offset 16 bytes; width 8 bytes.
+    pub offset: u64,
+    /// Wire offset 24 bytes; width 8 bytes.
+    pub expected: u64,
+    /// Wire offset 32 bytes; width 8 bytes.
+    pub owner: u64,
+    /// Wire offset 40 bytes; width 8 bytes.
+    pub deadline: u64,
+    /// Wire offset 48 bytes; width 8 bytes.
+    pub cancellation: u64,
+    /// Wire offset 56 bytes; width 8 bytes.
+    pub reserved: u64,
+}
+const _: () = assert!(core::mem::size_of::<HyperNativeSyncDomainWait>() == 64);
+const _: () = assert!(core::mem::align_of::<HyperNativeSyncDomainWait>() == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, options) == 0);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, vmo) == 8);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, offset) == 16);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, expected) == 24);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, owner) == 32);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, deadline) == 40);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, cancellation) == 48);
+const _: () = assert!(core::mem::offset_of!(HyperNativeSyncDomainWait, reserved) == 56);
 
 /// Minimum supported prefix of `thread_create_request`, in bytes; individual calls define their buffer lengths.
 pub const HYPER_NATIVE_THREAD_CREATE_REQUEST_MIN_SIZE: usize = 64;

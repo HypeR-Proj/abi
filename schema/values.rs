@@ -68,6 +68,25 @@ macro_rules! constant_groups {
 }
 
 constant_groups! {
+    /// Synchronization participant lifetime observations; Invalid is never recoverable.
+    enum sync_owner_state {
+        sync_owner_invalid = 0,
+        sync_owner_live = 1,
+        sync_owner_dead = 2,
+    }
+    /// Successful wait observations do not acquire userspace mutex ownership.
+    enum sync_wait_observation {
+        sync_wait_recheck = 0,
+        sync_wait_owner_exited = 1,
+    }
+    /// Shared mutex control format used by the C and Rust substrate libraries.
+    constants sync_mutex {
+        sync_owner_token_max = (1_u64 << 60) - 1,
+        sync_mutex_waiters = 1_u64 << 60,
+        sync_mutex_recovering = 1_u64 << 61,
+        sync_mutex_not_recoverable = 1_u64 << 62,
+    }
+
     /// Optional Native vDSO discovery in the application's ELF auxiliary vector.
     constants vdso {
         /// ELF base of the paired kernel vDSO. Zero or absence selects syscalls.

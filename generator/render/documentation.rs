@@ -298,6 +298,17 @@ fn describe_user_memory(name: &str, memory: schema::UserMemory) -> String {
     };
     let handles = match memory.handles {
         None => String::new(),
+        Some(IndirectHandles::BorrowFields { fields }) => format!(
+            ", borrowed-fields=[{}]",
+            fields
+                .iter()
+                .map(|field| format!(
+                    "{}: kind={}, rights=0x{:x}, optional={}",
+                    field.name, field.object, field.required_rights, field.optional
+                ))
+                .collect::<Vec<_>>()
+                .join("; ")
+        ),
         Some(IndirectHandles::BorrowRecords {
             handle_field,
             required_rights,

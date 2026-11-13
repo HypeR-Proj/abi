@@ -1129,6 +1129,87 @@ const SCHEDULING_PARAMETERS_FIELDS: &[Field] = &[
 
 pub const RECORDS: &[Record] = &[
     Record {
+        name: "sync_domain_binding",
+        minimum_size: 40,
+        size: 40,
+        alignment: 8,
+        fields: &[
+            Field {
+                name: "options",
+                kind: FieldKind::U64,
+                offset: 0,
+            },
+            Field {
+                name: "vmo",
+                kind: FieldKind::U64,
+                offset: 8,
+            },
+            Field {
+                name: "offset",
+                kind: FieldKind::U64,
+                offset: 16,
+            },
+            Field {
+                name: "length",
+                kind: FieldKind::U64,
+                offset: 24,
+            },
+            Field {
+                name: "reserved",
+                kind: FieldKind::U64,
+                offset: 32,
+            },
+        ],
+    },
+    Record {
+        name: "sync_domain_wait",
+        minimum_size: 64,
+        size: 64,
+        alignment: 8,
+        fields: &[
+            Field {
+                name: "options",
+                kind: FieldKind::U64,
+                offset: 0,
+            },
+            Field {
+                name: "vmo",
+                kind: FieldKind::U64,
+                offset: 8,
+            },
+            Field {
+                name: "offset",
+                kind: FieldKind::U64,
+                offset: 16,
+            },
+            Field {
+                name: "expected",
+                kind: FieldKind::U64,
+                offset: 24,
+            },
+            Field {
+                name: "owner",
+                kind: FieldKind::U64,
+                offset: 32,
+            },
+            Field {
+                name: "deadline",
+                kind: FieldKind::U64,
+                offset: 40,
+            },
+            Field {
+                name: "cancellation",
+                kind: FieldKind::U64,
+                offset: 48,
+            },
+            Field {
+                name: "reserved",
+                kind: FieldKind::U64,
+                offset: 56,
+            },
+        ],
+    },
+    Record {
         name: "thread_create_request",
         minimum_size: 64,
         size: 64,

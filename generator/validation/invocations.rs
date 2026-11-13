@@ -309,6 +309,7 @@ fn validate_arguments(
             }
             if let Some(handles) = memory.handles {
                 validate_indirect_handles(
+                    schema,
                     invocation,
                     argument,
                     memory,

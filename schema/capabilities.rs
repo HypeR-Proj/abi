@@ -367,6 +367,11 @@ pub const OBJECT_KINDS: &[ObjectKind] = &[
         name: "block_queue",
         transfer: TransferClass::RendezvousOnly,
     },
+    ObjectKind {
+        value: 45,
+        name: "sync_domain",
+        transfer: TransferClass::General,
+    },
 ];
 
 /// Read-only authority returned for a stateful directory enumeration stream.
@@ -446,6 +451,12 @@ rights! {
     sched_priority => RIGHT_SCHED_PRIORITY = 41,
     sched_class => RIGHT_SCHED_CLASS = 42,
     sched_budget => RIGHT_SCHED_BUDGET = 43,
+    // Establishing a persistent synchronization namespace is not ordinary WRITE.
+    sync_configure => RIGHT_SYNC_CONFIGURE = 44,
+    sync_join => RIGHT_SYNC_JOIN = 45,
+    // Per-word synchronization does not expose an object-level signal source.
+    sync_wait => RIGHT_SYNC_WAIT = 46,
+    sync_wake => RIGHT_SYNC_WAKE = 47,
 }
 
 pub const SCHEDULING_ELEVATION_RIGHTS: u64 =
@@ -476,8 +487,13 @@ pub const DIRECTORY_RIGHTS: u64 = RIGHT_DUPLICATE
     | RIGHT_LOCK_FILE
     | RIGHT_PROTECT;
 pub const FILE_RIGHTS: u64 = DIRECTORY_RIGHTS;
-pub const VMO_WRITABLE_RIGHTS: u64 =
-    RIGHT_DUPLICATE | RIGHT_TRANSFER | RIGHT_INSPECT | RIGHT_READ | RIGHT_WRITE | RIGHT_MAP;
+pub const VMO_WRITABLE_RIGHTS: u64 = RIGHT_DUPLICATE
+    | RIGHT_TRANSFER
+    | RIGHT_INSPECT
+    | RIGHT_READ
+    | RIGHT_WRITE
+    | RIGHT_MAP
+    | RIGHT_SYNC_CONFIGURE;
 pub const VMO_EXECUTABLE_RIGHTS: u64 =
     RIGHT_DUPLICATE | RIGHT_TRANSFER | RIGHT_INSPECT | RIGHT_READ | RIGHT_EXECUTE | RIGHT_MAP;
 pub const VMAR_RIGHTS: u64 = RIGHT_DUPLICATE | RIGHT_TRANSFER | RIGHT_INSPECT | RIGHT_MAP;
@@ -691,3 +707,12 @@ pub const SIGNALS: &[Signal] = &[
         name: "peer_closed",
     },
 ];
+
+/// Constructor grant; clients can receive operational rights without bind authority.
+pub const SYNC_DOMAIN_RIGHTS: u64 = RIGHT_DUPLICATE
+    | RIGHT_TRANSFER
+    | RIGHT_INSPECT
+    | RIGHT_SYNC_WAIT
+    | RIGHT_SYNC_WAKE
+    | RIGHT_SYNC_CONFIGURE
+    | RIGHT_SYNC_JOIN;

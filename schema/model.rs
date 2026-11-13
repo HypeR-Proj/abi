@@ -426,6 +426,10 @@ pub enum MemoryLength {
 /// Field names must resolve to fields of the record declared in [`UserMemory`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IndirectHandles {
+    /// Distinct borrowed handles in one size-delimited input record.
+    BorrowFields {
+        fields: &'static [BorrowedHandleField],
+    },
     /// Input records borrow handles for the duration of one syscall.
     BorrowRecords {
         handle_field: &'static str,
@@ -521,4 +525,13 @@ pub enum FlagPolicy {
     Strict,
     /// The individual method defines which additional bits may be tolerated.
     Flexible,
+}
+
+/// A live capability field in one input record; zero is allowed only when optional.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BorrowedHandleField {
+    pub object: &'static str,
+    pub name: &'static str,
+    pub required_rights: u64,
+    pub optional: bool,
 }

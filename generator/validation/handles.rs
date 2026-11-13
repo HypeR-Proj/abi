@@ -12,6 +12,7 @@ use schema::{
 use std::collections::BTreeSet;
 
 pub(super) fn validate_indirect_handles(
+    schema: &AbiSchema,
     invocation: &schema::Invocation,
     argument: &schema::Argument,
     memory: schema::UserMemory,
@@ -19,13 +20,43 @@ pub(super) fn validate_indirect_handles(
     record: Option<&schema::Record>,
     supported_rights: u64,
 ) -> Result<(), Error> {
-    if !matches!(memory.length, MemoryLength::Elements { .. }) {
+    if !matches!(handles, IndirectHandles::BorrowFields { .. })
+        && !matches!(memory.length, MemoryLength::Elements { .. })
+    {
         return invalid(format!(
             "invocation {} memory argument {} describes handles without element length",
             invocation.name, argument.name
         ));
     }
     match handles {
+        IndirectHandles::BorrowFields { fields } => {
+            if memory.direction != MemoryDirection::Read
+                || !matches!(memory.length, MemoryLength::Bytes { .. })
+                || fields.is_empty()
+            {
+                return invalid(format!(
+                    "invocation {} has invalid borrowed input fields",
+                    invocation.name
+                ));
+            }
+            let Some(record) = record else {
+                return invalid(format!(
+                    "invocation {} borrowed fields have no record",
+                    invocation.name
+                ));
+            };
+            let mut names = BTreeSet::new();
+            for field in fields {
+                require_object_kind(schema, invocation.name, field.object)?;
+                if !names.insert(field.name) || field.required_rights & !supported_rights != 0 {
+                    return invalid(format!(
+                        "invocation {} has duplicate fields or undeclared rights",
+                        invocation.name
+                    ));
+                }
+                require_record_field(record, field.name, FieldKind::U64, invocation, argument)?;
+            }
+        }
         IndirectHandles::BorrowRecords {
             handle_field,
             required_rights,
